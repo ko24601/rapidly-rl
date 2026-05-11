@@ -61,15 +61,6 @@ export default function Navbar() {
         gap: '32px',
         transition: 'background 0.3s, border-color 0.3s, box-shadow 0.3s',
       }}>
-        {/* Bottom glow line on scroll */}
-        {scrolled && (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '1px',
-            background: 'linear-gradient(to right, transparent, var(--primary), transparent)',
-            boxShadow: '0 0 12px var(--primary)',
-            opacity: 0.6,
-          }} />
-        )}
 
         {/* Logo + Name */}
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
