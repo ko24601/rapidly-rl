@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useDatabase } from '../context/DatabaseContext.jsx'
+import { CardSkeleton } from '../components/Skeleton.jsx'
 
 function DriverCard({ driver, index }) {
   return (
@@ -94,8 +95,8 @@ function DriverCard({ driver, index }) {
 }
 
 export default function Drivers() {
-  const { drivers } = useDatabase()
-  if (!drivers || drivers.length === 0) return null
+  const { drivers, loading } = useDatabase()
+  if (!loading && (!drivers || drivers.length === 0)) return null
 
   return (
     <div style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
@@ -111,7 +112,10 @@ export default function Drivers() {
           </div>
         </motion.div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
-          {drivers.map((driver, i) => <DriverCard key={driver.id} driver={driver} index={i} />)}
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
+            : drivers.map((driver, i) => <DriverCard key={driver.id} driver={driver} index={i} />)
+          }
         </div>
       </div>
     </div>

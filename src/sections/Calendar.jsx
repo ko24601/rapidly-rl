@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useDatabase } from '../context/DatabaseContext.jsx'
+import { RowSkeleton } from '../components/Skeleton.jsx'
 
 function StatusBadge({ status }) {
   const cfg = {
@@ -30,7 +31,7 @@ function StatusBadge({ status }) {
 }
 
 export default function Calendar() {
-  const { dbData } = useDatabase()
+  const { dbData, loading } = useDatabase()
   const rounds = dbData.calendar || []
 
   return (
@@ -53,7 +54,9 @@ export default function Calendar() {
             <div className="section-underline" />
           </div>
 
-          {rounds.length === 0 ? (
+          {loading ? (
+            <div>{Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={i} />)}</div>
+          ) : rounds.length === 0 ? (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--muted)', letterSpacing: '2px', textAlign: 'center', padding: '60px 20px', border: '1px dashed rgba(57,255,20,0.15)' }}>
               &gt; NO_ROUNDS_SCHEDULED_YET
             </div>
