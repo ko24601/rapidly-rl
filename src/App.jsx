@@ -9,6 +9,7 @@ import MobileNav from './components/MobileNav.jsx'
 import Home from './pages/Home.jsx'
 import Sponsors from './pages/Sponsors.jsx'
 import Admin from './pages/Admin.jsx'
+import DriversPage from './pages/DriversPage.jsx'
 import './styles/global.css'
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/drivers" element={<DriversPage />} />
           <Route path="/sponsors" element={<Sponsors />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>

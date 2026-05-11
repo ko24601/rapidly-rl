@@ -8,7 +8,6 @@ const BASE = import.meta.env.BASE_URL
 const NAV_LINKS = [
   { label: 'Home', section: 'home' },
   { label: 'Calendar', section: 'calendar' },
-  { label: 'Drivers', section: 'drivers' },
   { label: 'News', section: 'news' },
   { label: 'Staff', section: 'staff' },
 ]
@@ -90,6 +89,11 @@ export default function Navbar() {
               onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
             >{link.label}</button>
           ))}
+          <Link to="/drivers"
+            style={{ color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500, letterSpacing: '0.5px', padding: '8px 12px', transition: 'color 0.2s', whiteSpace: 'nowrap', textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+          >Drivers</Link>
         </div>
 
         {/* Desktop Actions */}
@@ -133,6 +137,10 @@ export default function Navbar() {
                   {link.label}
                 </button>
               ))}
+              <Link to="/drivers" onClick={() => setOpen(false)}
+                style={{ color: 'var(--text)', fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', textAlign: 'left', padding: '10px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none', display: 'block' }}>
+                Drivers
+              </Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '24px' }}>
               <a href={SITE.discord} target="_blank" rel="noopener noreferrer" style={{ ...btnStyle('primary'), justifyContent: 'center', display: 'flex' }}>Join Discord</a>
