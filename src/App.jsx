@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { SITE } from './config.js'
 import { DatabaseProvider } from './context/DatabaseContext.jsx'
+import { ToastProvider } from './context/ToastContext.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
 import Navbar from './components/Navbar.jsx'
+import MobileNav from './components/MobileNav.jsx'
 import Home from './pages/Home.jsx'
 import Sponsors from './pages/Sponsors.jsx'
 import Admin from './pages/Admin.jsx'
@@ -39,13 +41,16 @@ export default function App() {
 
   return (
     <DatabaseProvider>
-      <AnnouncementBanner />
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/sponsors" element={<Sponsors />} />
-        <Route path="/admin" element={<Admin />} />
-      </Routes>
+      <ToastProvider>
+        <AnnouncementBanner />
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/sponsors" element={<Sponsors />} />
+          <Route path="/admin" element={<Admin />} />
+        </Routes>
+        <MobileNav />
+      </ToastProvider>
     </DatabaseProvider>
   )
 }

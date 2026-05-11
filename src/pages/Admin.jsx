@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDatabase } from '../context/DatabaseContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,9 @@ const TABS = [
   { id: 'staff', label: 'Staff', icon: '👥' },
   { id: 'sponsors', label: 'Sponsors', icon: '🤝' },
   { id: 'enquiries', label: 'Enquiries', icon: '📬' },
+  { id: 'results', label: 'Results', icon: '🏁' },
+  { id: 'standings', label: 'Standings', icon: '🏆' },
+  { id: 'gallery', label: 'Gallery', icon: '🖼' },
 ]
 const PARTNERSHIP_TYPES = ['Title Sponsor', 'Co-Sponsor', 'Technical Partner', 'Media Partner', 'Community Partner', 'Other']
 const TIERS = ['Primary', 'Gold', 'Silver', 'Community']
@@ -313,6 +317,7 @@ function DashboardTab({ dbData, drivers, updateDb }) {
 
 function NewsTab({ dbData, updateDb }) {
   const news = dbData.news || []
+  const { showToast } = useToast()
   const [editing, setEditing] = useState(null)
   const [editData, setEditData] = useState({})
   const [adding, setAdding] = useState(false)
@@ -324,11 +329,13 @@ function NewsTab({ dbData, updateDb }) {
   async function saveEdit() {
     await updateDb({ news: news.map(n => n.id === editing ? editData : n) })
     setEditing(null)
+    showToast('News post saved successfully')
   }
 
   async function deleteItem(id) {
     if (!confirm('Delete this news post?')) return
     await updateDb({ news: news.filter(n => n.id !== id) })
+    showToast('News post deleted', 'error')
   }
 
   async function addItem() {
@@ -337,6 +344,7 @@ function NewsTab({ dbData, updateDb }) {
     await updateDb({ news: [item, ...news] })
     setNewItem({ title: '', category: NEWS_CATEGORIES[0], body: '', author: '' })
     setAdding(false)
+    showToast('News post published')
   }
 
   return (
@@ -412,6 +420,7 @@ function NewsTab({ dbData, updateDb }) {
 
 function CalendarTab({ dbData, updateDb }) {
   const rounds = dbData.calendar || []
+  const { showToast } = useToast()
   const [editing, setEditing] = useState(null)
   const [editData, setEditData] = useState({})
   const [adding, setAdding] = useState(false)
@@ -423,11 +432,13 @@ function CalendarTab({ dbData, updateDb }) {
   async function saveEdit() {
     await updateDb({ calendar: rounds.map(r => r.id === editing ? editData : r) })
     setEditing(null)
+    showToast('Round saved successfully')
   }
 
   async function deleteItem(id) {
     if (!confirm('Delete this round?')) return
     await updateDb({ calendar: rounds.filter(r => r.id !== id) })
+    showToast('Round deleted', 'error')
   }
 
   async function addItem() {
@@ -436,6 +447,7 @@ function CalendarTab({ dbData, updateDb }) {
     await updateDb({ calendar: [...rounds, item] })
     setNewItem(blank)
     setAdding(false)
+    showToast('Round added')
   }
 
   function RoundForm({ data, setData }) {
@@ -507,6 +519,7 @@ function CalendarTab({ dbData, updateDb }) {
 // ─── Drivers Tab ──────────────────────────────────────────────────────────────
 
 function DriversTab({ drivers, saveDriver, deleteDriver }) {
+  const { showToast } = useToast()
   const [editing, setEditing] = useState(null)
   const [editData, setEditData] = useState({})
   const [adding, setAdding] = useState(false)
@@ -524,6 +537,7 @@ function DriversTab({ drivers, saveDriver, deleteDriver }) {
   async function saveEdit() {
     await saveDriver(editing, editData)
     setEditing(null)
+    showToast('Driver saved successfully')
   }
 
   async function addItem() {
@@ -532,11 +546,13 @@ function DriversTab({ drivers, saveDriver, deleteDriver }) {
     await saveDriver(id, newItem)
     setNewItem(blank)
     setAdding(false)
+    showToast('Driver added')
   }
 
   async function handleDelete(id) {
     if (!confirm('Delete this driver?')) return
     await deleteDriver(id)
+    showToast('Driver deleted', 'error')
   }
 
   function DriverForm({ data, setData }) {
@@ -880,6 +896,355 @@ function EnquiriesTab({ dbData, updateDb }) {
   )
 }
 
+// ─── Results Tab ─────────────────────────────────────────────────────────────
+
+function ResultsTab({ dbData, updateDb }) {
+  const results = dbData.results || []
+  const { showToast } = useToast()
+  const [expanded, setExpanded] = useState(null)
+  const [adding, setAdding] = useState(false)
+  const blankEntry = { driver: '', pos: '', points: '', fastestLap: false }
+  const blank = { round: '', circuit: '', date: '', category: '', entries: [{ ...blankEntry }] }
+  const [newItem, setNewItem] = useState(blank)
+
+  function setNewField(k, v) { setNewItem(p => ({ ...p, [k]: v })) }
+  function setEntry(i, k, v) {
+    setNewItem(p => {
+      const entries = [...p.entries]
+      entries[i] = { ...entries[i], [k]: v }
+      return { ...p, entries }
+    })
+  }
+  function addEntryRow() { setNewItem(p => ({ ...p, entries: [...p.entries, { ...blankEntry }] })) }
+  function removeEntryRow(i) { setNewItem(p => ({ ...p, entries: p.entries.filter((_, idx) => idx !== i) })) }
+
+  async function addItem() {
+    if (!newItem.circuit) return
+    const item = { ...newItem, id: Date.now() }
+    await updateDb({ results: [item, ...results] })
+    setNewItem(blank)
+    setAdding(false)
+    showToast('Race result added')
+  }
+
+  async function deleteItem(id) {
+    if (!confirm('Delete this result?')) return
+    await updateDb({ results: results.filter(r => r.id !== id) })
+    showToast('Result deleted', 'error')
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+        <SaveBtn onClick={() => { setAdding(a => !a) }} label="+ Add Result" />
+      </div>
+
+      <AnimatePresence>
+        {adding && (
+          <EditBox key="add-result">
+            <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+              {grid2(<>
+                <FieldInput label="Round (e.g. R01)" value={newItem.round} onChange={v => setNewField('round', v)} placeholder="R01" />
+                <FieldInput label="Circuit" value={newItem.circuit} onChange={v => setNewField('circuit', v)} placeholder="Monza" />
+                <FieldInput label="Date" value={newItem.date} onChange={v => setNewField('date', v)} placeholder="2026-06-14" />
+                <FieldInput label="Category" value={newItem.category} onChange={v => setNewField('category', v)} placeholder="GT3 Pro" />
+              </>)}
+            </div>
+
+            {/* Entries */}
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
+              Driver Entries
+            </div>
+            {newItem.entries.map((entry, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 80px 80px 40px 32px', gap: '8px', marginBottom: '8px', alignItems: 'end' }}>
+                <FieldInput label={i === 0 ? 'Pos' : ''} value={entry.pos} onChange={v => setEntry(i, 'pos', v)} placeholder="1" />
+                <FieldInput label={i === 0 ? 'Driver' : ''} value={entry.driver} onChange={v => setEntry(i, 'driver', v)} placeholder="Driver name" />
+                <FieldInput label={i === 0 ? 'Points' : ''} value={entry.points} onChange={v => setEntry(i, 'points', v)} placeholder="25" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  {i === 0 && <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)' }}>FL</label>}
+                  <input
+                    type="checkbox"
+                    checked={entry.fastestLap}
+                    onChange={e => setEntry(i, 'fastestLap', e.target.checked)}
+                    style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', marginTop: '4px' }}
+                  />
+                </div>
+                <div />
+                <button onClick={() => removeEntryRow(i)} style={{ background: 'transparent', border: '1px solid rgba(255,80,80,0.3)', color: '#ff5555', cursor: 'pointer', fontSize: '14px', height: '36px', alignSelf: 'flex-end' }}>✕</button>
+              </div>
+            ))}
+            <button onClick={addEntryRow} style={{ background: 'transparent', border: '1px dashed var(--border)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '2px', padding: '8px 16px', cursor: 'pointer', width: '100%', marginBottom: '16px' }}>
+              + ADD ROW
+            </button>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <SaveBtn onClick={addItem} label="Save Result" />
+              <CancelBtn onClick={() => setAdding(false)} />
+            </div>
+          </EditBox>
+        )}
+      </AnimatePresence>
+
+      {results.length === 0 ? (
+        <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '12px', letterSpacing: '2px', padding: '40px', textAlign: 'center', border: '1px dashed var(--border)' }}>
+          NO RESULTS YET
+        </div>
+      ) : (
+        [...results].sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => (
+          <AdminCard key={r.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+              <div style={{ flex: 1 }}>
+                <button
+                  onClick={() => setExpanded(prev => prev === r.id ? null : r.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, display: 'flex', gap: '12px', alignItems: 'center' }}
+                >
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)', fontSize: '13px' }}>{r.round}</span>
+                  <span style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>{r.circuit}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', letterSpacing: '1px' }}>{r.date}</span>
+                  {r.category && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--primary)', border: '1px solid rgba(57,255,20,0.2)', padding: '2px 8px' }}>{r.category}</span>}
+                  <span style={{ color: 'var(--primary)', fontSize: '12px' }}>{expanded === r.id ? '▴' : '▾'}</span>
+                </button>
+                <AnimatePresence>
+                  {expanded === r.id && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden', marginTop: '12px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                            {['Pos', 'Driver', 'Points', 'FL'].map(h => (
+                              <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '2px', color: 'var(--muted)', padding: '6px 10px', textAlign: 'left', fontWeight: 400 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(r.entries || []).map((e, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                              <td style={{ padding: '6px 10px', fontFamily: 'var(--font-heading)', fontWeight: 700, color: e.pos == 1 ? '#FFD700' : e.pos == 2 ? '#C0C0C0' : e.pos == 3 ? '#CD7F32' : 'var(--text)' }}>{e.pos}</td>
+                              <td style={{ padding: '6px 10px' }}>{e.driver}</td>
+                              <td style={{ padding: '6px 10px', color: 'var(--primary)', fontWeight: 700 }}>{e.points}</td>
+                              <td style={{ padding: '6px 10px', color: e.fastestLap ? 'var(--primary)' : 'var(--muted)' }}>{e.fastestLap ? '✓' : '–'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              <button onClick={() => deleteItem(r.id)} style={{ background: 'transparent', border: '1px solid rgba(255,80,80,0.4)', color: '#ff5555', fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '5px 12px', cursor: 'pointer', flexShrink: 0 }}>Delete</button>
+            </div>
+          </AdminCard>
+        ))
+      )}
+    </div>
+  )
+}
+
+// ─── Standings Tab ────────────────────────────────────────────────────────────
+
+function StandingsTab({ dbData, updateDb }) {
+  const standings = dbData.standings || []
+  const results = dbData.results || []
+  const { showToast } = useToast()
+  const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [editData, setEditData] = useState({})
+  const blank = { driver: '', nationality: '', flag: '', points: '', wins: '', podiums: '', fastestLaps: '' }
+  const [newItem, setNewItem] = useState(blank)
+
+  async function addItem() {
+    if (!newItem.driver) return
+    const item = { ...newItem, id: Date.now() }
+    await updateDb({ standings: [...standings, item] })
+    setNewItem(blank)
+    setAdding(false)
+    showToast('Standing entry added')
+  }
+
+  function startEdit(s) { setEditing(s.id); setEditData({ ...s }); setAdding(false) }
+
+  async function saveEdit() {
+    await updateDb({ standings: standings.map(s => s.id === editing ? editData : s) })
+    setEditing(null)
+    showToast('Standing saved')
+  }
+
+  async function deleteItem(id) {
+    if (!confirm('Delete this standing?')) return
+    await updateDb({ standings: standings.filter(s => s.id !== id) })
+    showToast('Standing deleted', 'error')
+  }
+
+  async function recalculate() {
+    if (!results.length) { showToast('No results to aggregate from', 'error'); return }
+    const map = {}
+    results.forEach(r => {
+      (r.entries || []).forEach(e => {
+        if (!e.driver) return
+        if (!map[e.driver]) map[e.driver] = { driver: e.driver, nationality: '', flag: '', points: 0, wins: 0, podiums: 0, fastestLaps: 0 }
+        map[e.driver].points += Number(e.points) || 0
+        if (Number(e.pos) === 1) map[e.driver].wins += 1
+        if (Number(e.pos) <= 3) map[e.driver].podiums += 1
+        if (e.fastestLap) map[e.driver].fastestLaps += 1
+      })
+    })
+    // Preserve existing nationality/flag if present
+    const next = Object.values(map).map(entry => {
+      const existing = standings.find(s => s.driver === entry.driver)
+      return { id: existing?.id || Date.now() + Math.random(), ...entry, nationality: existing?.nationality || '', flag: existing?.flag || '' }
+    })
+    await updateDb({ standings: next })
+    showToast('Standings recalculated from results')
+  }
+
+  function StandingForm({ data, setData }) {
+    return (
+      <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+        {grid2(<>
+          <FieldInput label="Driver Name" value={data.driver || ''} onChange={v => setData(p => ({ ...p, driver: v }))} />
+          <FieldInput label="Nationality" value={data.nationality || ''} onChange={v => setData(p => ({ ...p, nationality: v }))} placeholder="United Kingdom" />
+          <FieldInput label="Flag Emoji" value={data.flag || ''} onChange={v => setData(p => ({ ...p, flag: v }))} placeholder="🇬🇧" />
+          <FieldInput label="Points" value={data.points || ''} onChange={v => setData(p => ({ ...p, points: v }))} placeholder="0" />
+          <FieldInput label="Wins" value={data.wins || ''} onChange={v => setData(p => ({ ...p, wins: v }))} placeholder="0" />
+          <FieldInput label="Podiums" value={data.podiums || ''} onChange={v => setData(p => ({ ...p, podiums: v }))} placeholder="0" />
+          <FieldInput label="Fastest Laps" value={data.fastestLaps || ''} onChange={v => setData(p => ({ ...p, fastestLaps: v }))} placeholder="0" />
+        </>)}
+      </div>
+    )
+  }
+
+  const sorted = [...standings].sort((a, b) => Number(b.points) - Number(a.points))
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <button onClick={recalculate} style={{ background: 'transparent', border: '1px solid rgba(57,255,20,0.4)', color: 'var(--primary)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '2px', padding: '8px 16px', cursor: 'pointer' }}>
+          ⟳ RECALC FROM RESULTS
+        </button>
+        <SaveBtn onClick={() => { setAdding(a => !a); setEditing(null) }} label="+ Add Entry" />
+      </div>
+
+      <AnimatePresence>
+        {adding && (
+          <EditBox key="add-standing">
+            <StandingForm data={newItem} setData={setNewItem} />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <SaveBtn onClick={addItem} label="Add Entry" />
+              <CancelBtn onClick={() => setAdding(false)} />
+            </div>
+          </EditBox>
+        )}
+      </AnimatePresence>
+
+      {sorted.length === 0 ? (
+        <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '12px', letterSpacing: '2px', padding: '40px', textAlign: 'center', border: '1px dashed var(--border)' }}>NO STANDINGS YET</div>
+      ) : (
+        sorted.map((s, i) => (
+          <AdminCard key={s.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '24px', fontWeight: 900, color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--muted)', minWidth: '32px' }}>{i + 1}</span>
+                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700 }}>{s.flag} {s.driver}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>{s.nationality}</span>
+                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 900, color: 'var(--primary)' }}>{s.points} pts</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>W:{s.wins || 0} P:{s.podiums || 0} FL:{s.fastestLaps || 0}</span>
+              </div>
+              <RowBtns onEdit={() => startEdit(s)} onDelete={() => deleteItem(s.id)} />
+            </div>
+            <AnimatePresence>
+              {editing === s.id && (
+                <EditBox>
+                  <StandingForm data={editData} setData={setEditData} />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <SaveBtn onClick={saveEdit} />
+                    <CancelBtn onClick={() => setEditing(null)} />
+                  </div>
+                </EditBox>
+              )}
+            </AnimatePresence>
+          </AdminCard>
+        ))
+      )}
+    </div>
+  )
+}
+
+// ─── Gallery Tab ──────────────────────────────────────────────────────────────
+
+function GalleryTab({ dbData, updateDb }) {
+  const gallery = dbData.gallery || []
+  const { showToast } = useToast()
+  const [caption, setCaption] = useState('')
+  const [uploading, setUploading] = useState(false)
+
+  async function handleUpload(file) {
+    if (!file) return
+    setUploading(true)
+    try {
+      const src = await compressImage(file, 1200, 0.82)
+      const item = { id: Date.now(), src, caption, date: new Date().toISOString().slice(0, 10) }
+      await updateDb({ gallery: [...gallery, item] })
+      setCaption('')
+      showToast('Image uploaded')
+    } catch {
+      showToast('Upload failed', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function deleteItem(id) {
+    if (!confirm('Delete this image?')) return
+    await updateDb({ gallery: gallery.filter(g => g.id !== id) })
+    showToast('Image deleted', 'error')
+  }
+
+  return (
+    <div>
+      <AdminCard label="Upload Image">
+        <div style={{ display: 'grid', gap: '12px' }}>
+          <FieldInput label="Caption (optional)" value={caption} onChange={setCaption} placeholder="Race day at Monza..." />
+          <div>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '8px' }}>
+              Image (max 1200px, JPEG 0.82q)
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploading}
+              onChange={e => e.target.files[0] && handleUpload(e.target.files[0])}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }}
+            />
+          </div>
+          {uploading && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--primary)', letterSpacing: '2px' }}>Uploading...</span>}
+        </div>
+      </AdminCard>
+
+      {gallery.length === 0 ? (
+        <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '12px', letterSpacing: '2px', padding: '40px', textAlign: 'center', border: '1px dashed var(--border)' }}>NO IMAGES YET</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+          {gallery.map(item => (
+            <div key={item.id} style={{ position: 'relative', border: '1px solid var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+              <img src={item.src} alt={item.caption || ''} style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
+              <div style={{ padding: '8px 10px', background: 'var(--card)' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.caption || '—'}
+                </div>
+                <button
+                  onClick={() => deleteItem(item.id)}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,80,80,0.4)', color: '#ff5555', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '1px', padding: '3px 10px', cursor: 'pointer', width: '100%' }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 
 function LoginScreen({ onLogin, passHash }) {
@@ -1046,6 +1411,9 @@ export default function Admin() {
           {activeTab === 'staff' && <StaffTab dbData={dbData} updateDb={updateDb} />}
           {activeTab === 'sponsors' && <SponsorsTab dbData={dbData} updateDb={updateDb} />}
           {activeTab === 'enquiries' && <EnquiriesTab dbData={dbData} updateDb={updateDb} />}
+          {activeTab === 'results' && <ResultsTab dbData={dbData} updateDb={updateDb} />}
+          {activeTab === 'standings' && <StandingsTab dbData={dbData} updateDb={updateDb} />}
+          {activeTab === 'gallery' && <GalleryTab dbData={dbData} updateDb={updateDb} />}
         </main>
       </div>
 

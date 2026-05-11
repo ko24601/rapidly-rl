@@ -3,6 +3,9 @@ import Calendar from '../sections/Calendar.jsx'
 import Drivers from '../sections/Drivers.jsx'
 import News from '../sections/News.jsx'
 import Staff from '../sections/Staff.jsx'
+import Results from '../sections/Results.jsx'
+import Standings from '../sections/Standings.jsx'
+import Gallery from '../sections/Gallery.jsx'
 import StatBar from '../components/StatBar.jsx'
 import SectionDivider from '../components/SectionDivider.jsx'
 import Footer from '../components/Footer.jsx'
@@ -39,6 +42,18 @@ export default function Home() {
         <section id="staff">
           <Staff />
         </section>
+
+        <SectionDivider />
+
+        <Results />
+
+        <SectionDivider flip />
+
+        <Standings />
+
+        <SectionDivider />
+
+        <Gallery />
       </main>
 
       <Footer />

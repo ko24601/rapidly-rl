@@ -16,6 +16,9 @@ const DEFAULT_DB = {
   staff: [],
   enquiries: [],
   passHash: '',
+  results: [],
+  standings: [],
+  gallery: [],
 }
 
 const DatabaseContext = createContext(null)

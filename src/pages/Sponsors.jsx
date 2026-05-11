@@ -4,10 +4,17 @@ import { useDatabase } from '../context/DatabaseContext.jsx'
 import { SITE } from '../config.js'
 
 const TIER_COLORS = {
-  Primary: { bg: 'rgba(255,215,0,0.1)', border: 'rgba(255,215,0,0.4)', color: '#FFD700' },
-  Gold: { bg: 'rgba(255,165,0,0.1)', border: 'rgba(255,165,0,0.3)', color: '#FFA500' },
-  Silver: { bg: 'rgba(192,192,192,0.1)', border: 'rgba(192,192,192,0.3)', color: '#C0C0C0' },
-  Community: { bg: 'rgba(100,200,255,0.08)', border: 'rgba(100,200,255,0.2)', color: '#64C8FF' },
+  Primary: { bg: 'rgba(255,215,0,0.08)', border: 'rgba(255,215,0,0.5)', color: '#FFD700', glow: 'rgba(255,215,0,0.2)' },
+  Gold: { bg: 'rgba(255,165,0,0.08)', border: 'rgba(255,165,0,0.4)', color: '#FFA500', glow: 'rgba(255,165,0,0.15)' },
+  Silver: { bg: 'rgba(192,192,192,0.06)', border: 'rgba(192,192,192,0.3)', color: '#C0C0C0', glow: 'rgba(192,192,192,0.1)' },
+  Community: { bg: 'rgba(100,200,255,0.05)', border: 'rgba(100,200,255,0.2)', color: '#64C8FF', glow: 'transparent' },
+}
+
+const TIER_SIZE = {
+  Primary: { minWidth: '340px', padding: '32px' },
+  Gold: { minWidth: '280px', padding: '28px' },
+  Silver: { minWidth: '240px', padding: '24px' },
+  Community: { minWidth: '200px', padding: '20px' },
 }
 
 const PARTNERSHIP_TYPES = ['Title Sponsor', 'Co-Sponsor', 'Technical Partner', 'Media Partner', 'Community Partner', 'Other']
@@ -16,15 +23,16 @@ const BUDGETS = ['Under $500', '$500 – $2,000', '$2,000 – $5,000', '$5,000 �
 function inputStyle(focused) {
   return {
     background: 'var(--surface)',
-    border: `1px solid ${focused ? 'var(--primary)' : 'var(--border)'}`,
+    border: `1px solid ${focused ? '#39FF14' : 'var(--border)'}`,
     color: 'var(--text)',
     fontFamily: 'var(--font-body)',
     fontSize: '15px',
     padding: '12px 16px',
     outline: 'none',
     width: '100%',
-    transition: 'border-color 0.2s',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
     borderRadius: '2px',
+    boxShadow: focused ? '0 0 0 2px rgba(57,255,20,0.12)' : 'none',
   }
 }
 
@@ -45,7 +53,7 @@ export default function Sponsors() {
 
   const [form, setForm] = useState({ name: '', contact: '', type: PARTNERSHIP_TYPES[0], budget: BUDGETS[0], message: '' })
   const [focused, setFocused] = useState('')
-  const [status, setStatus] = useState('') // '' | 'sending' | 'success' | 'error'
+  const [status, setStatus] = useState('')
 
   function handleChange(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -55,7 +63,6 @@ export default function Sponsors() {
     const enquiry = { ...form, date: new Date().toISOString().slice(0, 10), id: Date.now() }
     try {
       await updateDb({ enquiries: [...(dbData.enquiries || []), enquiry] })
-      // Web3Forms submission
       await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,7 +84,7 @@ export default function Sponsors() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '80px' }}>
       {/* Hero */}
       <div style={{
-        background: 'linear-gradient(180deg, rgba(255,0,0,0.08) 0%, transparent 100%)',
+        background: 'linear-gradient(180deg, rgba(57,255,20,0.06) 0%, transparent 100%)',
         borderBottom: '1px solid var(--border)',
         padding: '80px 40px 60px',
         textAlign: 'center',
@@ -98,21 +105,156 @@ export default function Sponsors() {
         </motion.div>
       </div>
 
+      {/* Why Sponsor pitch section */}
+      <div style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'linear-gradient(135deg, rgba(57,255,20,0.07) 0%, rgba(57,255,20,0.02) 50%, transparent 100%)',
+        borderBottom: '1px solid rgba(57,255,20,0.15)',
+        padding: '64px 40px',
+      }}>
+        {/* Diagonal accent */}
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'repeating-linear-gradient(135deg, transparent, transparent 60px, rgba(57,255,20,0.015) 60px, rgba(57,255,20,0.015) 61px)',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative' }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: '48px' }}
+          >
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '4px', color: 'var(--primary)', marginBottom: '12px' }}>
+              // WHY PARTNER WITH US
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(28px, 4vw, 48px)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.5px', marginBottom: '16px' }}>
+              Why Sponsor RAPIDLY RL?
+            </h2>
+            <p style={{ fontSize: '15px', color: 'var(--muted)', maxWidth: '600px', margin: '0 auto', lineHeight: 1.7 }}>
+              We are one of the fastest-growing sim racing leagues. Your brand gets exposure to a dedicated, engaged motorsport community across every race weekend.
+            </p>
+          </motion.div>
+
+          {/* Stat boxes */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+            {[
+              { stat: '500+', label: 'Community Members', icon: '👥' },
+              { stat: '20+', label: 'Active Racers', icon: '🏎' },
+              { stat: '2026', label: 'Season', icon: '🏆' },
+            ].map((item, i) => (
+              <motion.div
+                key={item.label}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                style={{
+                  background: 'rgba(10,10,10,0.8)',
+                  border: '1px solid rgba(57,255,20,0.2)',
+                  borderTop: '3px solid var(--primary)',
+                  borderRadius: '2px',
+                  padding: '28px 24px',
+                  textAlign: 'center',
+                  boxShadow: '0 0 30px rgba(57,255,20,0.05)',
+                }}
+              >
+                <div style={{ fontSize: '32px', marginBottom: '10px' }}>{item.icon}</div>
+                <div style={{
+                  fontFamily: 'var(--font-heading)',
+                  fontSize: '48px',
+                  fontWeight: 900,
+                  color: 'var(--primary)',
+                  lineHeight: 1,
+                  textShadow: '0 0 20px rgba(57,255,20,0.4)',
+                  marginBottom: '8px',
+                }}>
+                  {item.stat}
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)' }}>
+                  {item.label}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '60px 40px 0' }}>
+
+        {/* Tier system visual */}
+        <section style={{ marginBottom: '80px' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '4px', color: 'var(--primary)', marginBottom: '12px' }}>
+            // PARTNERSHIP TIERS
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '36px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '32px' }}>
+            Choose Your Tier
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            {Object.entries(TIER_COLORS).map(([tier, styles], i) => (
+              <motion.div
+                key={tier}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
+                style={{
+                  background: styles.bg,
+                  border: `1px solid ${styles.border}`,
+                  borderTop: `3px solid ${styles.color}`,
+                  borderRadius: '2px',
+                  padding: TIER_SIZE[tier]?.padding || '24px',
+                  boxShadow: `0 0 30px ${styles.glow}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  letterSpacing: '3px',
+                  textTransform: 'uppercase',
+                  color: styles.color,
+                  padding: '3px 8px',
+                  border: `1px solid ${styles.border}`,
+                  alignSelf: 'flex-start',
+                }}>
+                  {tier}
+                </div>
+                <div style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 800, color: styles.color }}>
+                  {tier === 'Primary' && 'Title Partner'}
+                  {tier === 'Gold' && 'Gold Sponsor'}
+                  {tier === 'Silver' && 'Silver Sponsor'}
+                  {tier === 'Community' && 'Community Friend'}
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+                  {tier === 'Primary' && 'Logo on livery, full branding across all channels, race-day shoutouts.'}
+                  {tier === 'Gold' && 'Featured sponsor, social media promotion, event mentions.'}
+                  {tier === 'Silver' && 'Website listing, newsletter feature, community shoutouts.'}
+                  {tier === 'Community' && 'Discord recognition, newsletter mention, supporter badge.'}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
         {/* Sponsors Grid */}
         {sponsors.length > 0 && (
           <section style={{ marginBottom: '80px' }}>
-            <div className="section-header">
-              <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '36px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase' }}>
-                Our Partners
-              </h2>
-              <div className="section-underline" />
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '4px', color: 'var(--primary)', marginBottom: '12px' }}>
+              // CURRENT PARTNERS
             </div>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '36px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '32px' }}>
+              Our Partners
+            </h2>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
               gap: '20px',
-              marginTop: '32px',
             }}>
               {sponsors.map((s, i) => {
                 const tier = TIER_COLORS[s.tier] || TIER_COLORS.Community
@@ -126,11 +268,13 @@ export default function Sponsors() {
                     style={{
                       background: 'var(--card)',
                       border: `1px solid ${tier.border}`,
+                      borderTop: `3px solid ${tier.color}`,
                       borderRadius: '2px',
                       padding: '24px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '12px',
+                      boxShadow: `0 0 20px ${tier.glow}`,
                     }}
                   >
                     {s.logo && (
@@ -162,18 +306,17 @@ export default function Sponsors() {
 
         {/* Enquiry Form */}
         <section>
-          <div className="section-header">
-            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '36px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase' }}>
-              Get In Touch
-            </h2>
-            <div className="section-underline" />
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '4px', color: 'var(--primary)', marginBottom: '12px' }}>
+            // GET IN TOUCH
           </div>
+          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '36px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '40px' }}>
+            Get In Touch
+          </h2>
 
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
             gap: '48px',
-            marginTop: '40px',
             alignItems: 'start',
           }}>
             {/* Info panel */}
@@ -184,7 +327,7 @@ export default function Sponsors() {
               </p>
               {Object.entries(TIER_COLORS).map(([tier, styles]) => (
                 <div key={tier} style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
-                  <div style={{ width: '4px', height: '36px', background: styles.color, flexShrink: 0 }} />
+                  <div style={{ width: '4px', height: '36px', background: styles.color, flexShrink: 0, boxShadow: `0 0 8px ${styles.glow}` }} />
                   <div>
                     <div style={{ fontFamily: 'var(--font-heading)', fontSize: '16px', fontWeight: 700, letterSpacing: '1px', color: styles.color }}>
                       {tier}

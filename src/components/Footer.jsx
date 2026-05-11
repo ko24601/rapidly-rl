@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { SITE } from '../config.js'
+import DiscordWidget from './DiscordWidget.jsx'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -53,6 +54,12 @@ export default function Footer() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Discord widget */}
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '20px', opacity: 0.8 }}>Community</div>
+            <DiscordWidget memberCount="500+" onlineCount="50+" />
           </div>
 
           {/* More links */}
