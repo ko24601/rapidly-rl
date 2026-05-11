@@ -59,7 +59,7 @@ export default function Footer() {
           {/* Discord widget */}
           <div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '20px', opacity: 0.8 }}>Community</div>
-            <DiscordWidget memberCount="500+" onlineCount="50+" />
+            <DiscordWidget />
           </div>
 
           {/* More links */}
