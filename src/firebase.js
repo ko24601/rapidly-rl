@@ -1,15 +1,14 @@
-// Replace with your Firebase project config
-// https://console.firebase.google.com/ → Project Settings → Your Apps → SDK setup
 import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyDu1pHaVe2f_Wc8QiWRBxbh4Zf20J-QmSY",
+  authDomain: "rapidly-rl.firebaseapp.com",
+  projectId: "rapidly-rl",
+  storageBucket: "rapidly-rl.firebasestorage.app",
+  messagingSenderId: "1073457876113",
+  appId: "1:1073457876113:web:33571e45d5354232bb0330",
+  measurementId: "G-YVLBSCX7CK"
 }
 
 const app = initializeApp(firebaseConfig)
