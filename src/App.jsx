@@ -3,7 +3,6 @@ import { Routes, Route } from 'react-router-dom'
 import { SITE } from './config.js'
 import { DatabaseProvider } from './context/DatabaseContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
-import AnnouncementBanner from './components/AnnouncementBanner.jsx'
 import Navbar from './components/Navbar.jsx'
 import MobileNav from './components/MobileNav.jsx'
 import Home from './pages/Home.jsx'
@@ -43,7 +42,6 @@ export default function App() {
   return (
     <DatabaseProvider>
       <ToastProvider>
-        <AnnouncementBanner />
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />

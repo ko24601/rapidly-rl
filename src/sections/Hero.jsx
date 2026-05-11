@@ -165,6 +165,8 @@ export default function Hero() {
       </motion.div>
 
 
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(to right, var(--primary), rgba(57,255,20,0.3), transparent)', zIndex: 4, boxShadow: '0 0 12px var(--primary)' }} />
+
       <style>{`@media(max-width:768px){.hero-widget{display:none!important}}`}</style>
     </div>
   )
