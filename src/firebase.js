@@ -2,13 +2,13 @@ import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDu1pHaVe2f_Wc8QiWRBxbh4Zf20J-QmSY",
-  authDomain: "rapidly-rl.firebaseapp.com",
-  projectId: "rapidly-rl",
-  storageBucket: "rapidly-rl.firebasestorage.app",
-  messagingSenderId: "1073457876113",
-  appId: "1:1073457876113:web:33571e45d5354232bb0330",
-  measurementId: "G-YVLBSCX7CK"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
 
 const app = initializeApp(firebaseConfig)
