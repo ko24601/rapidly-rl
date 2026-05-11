@@ -6,7 +6,6 @@ import { SITE } from '../config.js'
 const NAV_LINKS = [
   { label: 'Home', section: 'home' },
   { label: 'Calendar', section: 'calendar' },
-  { label: 'Liveries', section: 'liveries' },
   { label: 'Drivers', section: 'drivers' },
   { label: 'News', section: 'news' },
   { label: 'Staff', section: 'staff' },
@@ -100,12 +99,6 @@ export default function Navbar() {
 
         {/* Desktop Action Buttons */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }} className="desktop-actions">
-          <a
-            href={SITE.store}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={btnStyle('ghost')}
-          >Store</a>
           <a
             href={SITE.discord}
             target="_blank"
@@ -217,7 +210,6 @@ export default function Navbar() {
 
             {/* CTA buttons pinned to bottom */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '24px' }}>
-              <a href={SITE.store} target="_blank" rel="noopener noreferrer" style={{ ...btnStyle('ghost'), justifyContent: 'center', display: 'flex' }}>Store</a>
               <a href={SITE.discord} target="_blank" rel="noopener noreferrer" style={{ ...btnStyle('primary'), justifyContent: 'center', display: 'flex' }}>Join Discord</a>
               <Link to="/sponsors" onClick={() => setOpen(false)} style={{ ...btnStyle('ghost'), justifyContent: 'center', display: 'flex' }}>Become a Sponsor</Link>
               <Link to="/admin" onClick={() => setOpen(false)} style={{ ...btnStyle('ghost'), justifyContent: 'center', display: 'flex' }}>Admin</Link>
