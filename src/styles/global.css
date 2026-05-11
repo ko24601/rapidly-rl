@@ -1,131 +1,98 @@
 :root {
-  --primary: #FF0000;
-  --primary-glow: rgba(255, 0, 0, 0.6);
+  --primary: #39FF14;
+  --primary-glow: rgba(57,255,20,0.55);
   --bg: #050505;
-  --card: rgba(15, 15, 15, 0.85);
-  --surface: #0a0a0a;
+  --card: rgba(10,10,10,0.95);
+  --surface: #080808;
   --text: #e8e8e8;
-  --muted: #666;
-  --border: rgba(255, 255, 255, 0.08);
+  --muted: #555;
+  --border: rgba(255,255,255,0.07);
   --font-heading: 'Barlow Condensed', sans-serif;
   --font-body: 'Barlow', sans-serif;
   --font-mono: 'Roboto Mono', monospace;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  scroll-behavior: smooth;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
   overflow-x: hidden;
-  position: relative;
 }
 
+/* Scan line */
 body::after {
   content: '';
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 1px;
-  background: rgba(255, 0, 0, 0.03);
-  animation: scan 8s linear infinite;
+  top: -2px; left: 0;
+  width: 100%; height: 2px;
+  background: linear-gradient(to right, transparent, rgba(57,255,20,0.4), transparent);
+  animation: scan 10s linear infinite;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 9998;
 }
+@keyframes scan { 0%{top:-2px} 100%{top:100vh} }
 
-@keyframes scan {
-  0% { top: 0; }
-  100% { top: 100vh; }
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 2px; }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text);
-}
+a, button, input, textarea, select, [role="button"] { -webkit-tap-highlight-color: transparent; }
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+button { cursor: pointer; border: none; background: none; font-family: var(--font-body); }
+input, textarea, select { font-family: var(--font-body); }
 
-/* Remove tap highlight on all interactive elements */
-a,
-button,
-input,
-textarea,
-select,
-[role="button"] {
-  -webkit-tap-highlight-color: transparent;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-img {
-  max-width: 100%;
-  display: block;
-}
-
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-family: var(--font-body);
-}
-
-input,
-textarea,
-select {
-  font-family: var(--font-body);
-}
-
+/* Layout */
 .section-wrapper {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 80px 40px;
+  padding: 100px 40px;
 }
+@media (max-width: 768px) { .section-wrapper { padding: 64px 20px; } }
 
-@media (max-width: 768px) {
-  .section-wrapper {
-    padding: 60px 20px;
-  }
-}
-
-.section-header {
-  margin-bottom: 48px;
-}
-
-.section-header h2 {
-  font-family: var(--font-heading);
-  font-size: clamp(28px, 5vw, 48px);
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--text);
-}
+.section-header { margin-bottom: 56px; }
 
 .section-underline {
-  width: 60px;
-  height: 3px;
+  width: 48px; height: 3px;
   background: var(--primary);
-  box-shadow: 0 0 12px var(--primary-glow);
-  margin-top: 12px;
+  box-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary-glow);
+  margin-top: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.section-underline::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent);
+  animation: shimmer 2.5s ease-in-out infinite;
+}
+@keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(400%)} }
+
+/* Glitch layers */
+@keyframes glitch1 {
+  0%,89%,100%{clip-path:inset(0 0 100% 0);transform:translate(0)}
+  90%{clip-path:inset(20% 0 40% 0);transform:translate(-4px,1px)}
+  92%{clip-path:inset(60% 0 10% 0);transform:translate(4px,-1px)}
+  94%{clip-path:inset(40% 0 30% 0);transform:translate(-2px,2px)}
+  96%{clip-path:inset(10% 0 70% 0);transform:translate(3px,-1px)}
+}
+@keyframes glitch2 {
+  0%,87%,100%{clip-path:inset(0 0 100% 0);transform:translate(0)}
+  88%{clip-path:inset(50% 0 20% 0);transform:translate(3px,1px)}
+  90%{clip-path:inset(15% 0 55% 0);transform:translate(-3px,-2px)}
+  93%{clip-path:inset(75% 0 5% 0);transform:translate(2px,1px)}
+  95%{clip-path:inset(30% 0 45% 0);transform:translate(-4px,0)}
+}
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+@keyframes statusPulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(57,255,20,0.6)}
+  50%{box-shadow:0 0 0 6px rgba(57,255,20,0)}
+}
+@keyframes heroPulse { 0%,100%{opacity:0.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.1)} }
+@keyframes neonFlicker {
+  0%,95%,100%{opacity:1} 96%{opacity:0.7} 98%{opacity:0.9} 99%{opacity:0.6}
 }
