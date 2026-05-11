@@ -418,6 +418,21 @@ function NewsTab({ dbData, updateDb }) {
 
 // ─── Calendar Tab ─────────────────────────────────────────────────────────────
 
+function RoundForm({ data, setData }) {
+  return (
+    <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+      {grid2(<>
+        <FieldInput label="Round #" value={data.round || ''} onChange={v => setData(p => ({ ...p, round: v }))} placeholder="1" />
+        <FieldInput label="Circuit" value={data.circuit || ''} onChange={v => setData(p => ({ ...p, circuit: v }))} placeholder="Monza" />
+        <FieldInput label="Country" value={data.country || ''} onChange={v => setData(p => ({ ...p, country: v }))} placeholder="Italy" />
+        <FieldInput label="Category" value={data.category || ''} onChange={v => setData(p => ({ ...p, category: v }))} placeholder="GT3 Pro" />
+        <FieldInput label="Date" value={data.date || ''} onChange={v => setData(p => ({ ...p, date: v }))} placeholder="2026-06-14" />
+        <FieldSelect label="Status" value={data.status || 'TBD'} onChange={v => setData(p => ({ ...p, status: v }))} options={['Next', 'Done', 'TBD']} />
+      </>)}
+    </div>
+  )
+}
+
 function CalendarTab({ dbData, updateDb }) {
   const rounds = dbData.calendar || []
   const { showToast } = useToast()
@@ -448,21 +463,6 @@ function CalendarTab({ dbData, updateDb }) {
     setNewItem(blank)
     setAdding(false)
     showToast('Round added')
-  }
-
-  function RoundForm({ data, setData }) {
-    return (
-      <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
-        {grid2(<>
-          <FieldInput label="Round #" value={data.round || ''} onChange={v => setData(p => ({ ...p, round: v }))} placeholder="1" />
-          <FieldInput label="Circuit" value={data.circuit || ''} onChange={v => setData(p => ({ ...p, circuit: v }))} placeholder="Monza" />
-          <FieldInput label="Country" value={data.country || ''} onChange={v => setData(p => ({ ...p, country: v }))} placeholder="Italy" />
-          <FieldInput label="Category" value={data.category || ''} onChange={v => setData(p => ({ ...p, category: v }))} placeholder="GT3 Pro" />
-          <FieldInput label="Date" value={data.date || ''} onChange={v => setData(p => ({ ...p, date: v }))} placeholder="2026-06-14" />
-          <FieldSelect label="Status" value={data.status || 'TBD'} onChange={v => setData(p => ({ ...p, status: v }))} options={['Next', 'Done', 'TBD']} />
-        </>)}
-      </div>
-    )
   }
 
   return (
@@ -518,6 +518,29 @@ function CalendarTab({ dbData, updateDb }) {
 
 // ─── Drivers Tab ──────────────────────────────────────────────────────────────
 
+function DriverForm({ data, setData, onPhotoChange }) {
+  return (
+    <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+      {grid2(<>
+        <FieldInput label="Name" value={data.name || ''} onChange={v => setData(p => ({ ...p, name: v }))} />
+        <FieldSelect label="Nationality" value={data.nationality || COUNTRIES[0]} onChange={v => setData(p => ({ ...p, nationality: v }))} options={COUNTRIES} />
+        <FieldInput label="Car Number" value={data.number || ''} onChange={v => setData(p => ({ ...p, number: v }))} />
+        <FieldInput label="Category" value={data.category || ''} onChange={v => setData(p => ({ ...p, category: v }))} />
+        <FieldInput label="Discord" value={data.discord || ''} onChange={v => setData(p => ({ ...p, discord: v }))} />
+      </>)}
+      <FieldTextarea label="Bio" value={data.bio || ''} onChange={v => setData(p => ({ ...p, bio: v }))} rows={2} />
+      <div>
+        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '5px' }}>
+          Photo (will be compressed to 480px)
+        </label>
+        <input type="file" accept="image/*" onChange={e => e.target.files[0] && onPhotoChange(e.target.files[0])}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }} />
+        {data.photo && <img src={data.photo} style={{ width: '80px', height: '107px', objectFit: 'cover', marginTop: '8px', border: '1px solid var(--border)' }} />}
+      </div>
+    </div>
+  )
+}
+
 function DriversTab({ drivers, saveDriver, deleteDriver }) {
   const { showToast } = useToast()
   const [editing, setEditing] = useState(null)
@@ -555,29 +578,6 @@ function DriversTab({ drivers, saveDriver, deleteDriver }) {
     showToast('Driver deleted', 'error')
   }
 
-  function DriverForm({ data, setData }) {
-    return (
-      <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
-        {grid2(<>
-          <FieldInput label="Name" value={data.name || ''} onChange={v => setData(p => ({ ...p, name: v }))} />
-          <FieldSelect label="Nationality" value={data.nationality || COUNTRIES[0]} onChange={v => setData(p => ({ ...p, nationality: v }))} options={COUNTRIES} />
-          <FieldInput label="Car Number" value={data.number || ''} onChange={v => setData(p => ({ ...p, number: v }))} />
-          <FieldInput label="Category" value={data.category || ''} onChange={v => setData(p => ({ ...p, category: v }))} />
-          <FieldInput label="Discord" value={data.discord || ''} onChange={v => setData(p => ({ ...p, discord: v }))} />
-        </>)}
-        <FieldTextarea label="Bio" value={data.bio || ''} onChange={v => setData(p => ({ ...p, bio: v }))} rows={2} />
-        <div>
-          <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '5px' }}>
-            Photo (will be compressed to 480px)
-          </label>
-          <input type="file" accept="image/*" onChange={e => e.target.files[0] && handlePhoto(e.target.files[0], setData)}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }} />
-          {data.photo && <img src={data.photo} style={{ width: '80px', height: '107px', objectFit: 'cover', marginTop: '8px', border: '1px solid var(--border)' }} />}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
@@ -586,7 +586,7 @@ function DriversTab({ drivers, saveDriver, deleteDriver }) {
       <AnimatePresence>
         {adding && (
           <EditBox>
-            <DriverForm data={newItem} setData={setNewItem} />
+            <DriverForm data={newItem} setData={setNewItem} onPhotoChange={f => handlePhoto(f, setNewItem)} />
             <div style={{ display: 'flex', gap: '8px' }}>
               <SaveBtn onClick={addItem} label="Add Driver" />
               <CancelBtn onClick={() => setAdding(false)} />
@@ -614,7 +614,7 @@ function DriversTab({ drivers, saveDriver, deleteDriver }) {
             <AnimatePresence>
               {editing === d.id && (
                 <EditBox>
-                  <DriverForm data={editData} setData={setEditData} />
+                  <DriverForm data={editData} setData={setEditData} onPhotoChange={f => handlePhoto(f, setEditData)} />
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <SaveBtn onClick={saveEdit} />
                     <CancelBtn onClick={() => setEditing(null)} />
@@ -630,6 +630,27 @@ function DriversTab({ drivers, saveDriver, deleteDriver }) {
 }
 
 // ─── Staff Tab ────────────────────────────────────────────────────────────────
+
+function StaffForm({ data, setData, onPhotoChange }) {
+  return (
+    <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+      {grid2(<>
+        <FieldInput label="Name" value={data.name || ''} onChange={v => setData(p => ({ ...p, name: v }))} />
+        <FieldInput label="Role" value={data.role || ''} onChange={v => setData(p => ({ ...p, role: v }))} />
+        <FieldInput label="Discord" value={data.discord || ''} onChange={v => setData(p => ({ ...p, discord: v }))} />
+      </>)}
+      <FieldTextarea label="Bio" value={data.bio || ''} onChange={v => setData(p => ({ ...p, bio: v }))} rows={2} />
+      <div>
+        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '5px' }}>
+          Photo (300px / 0.72q)
+        </label>
+        <input type="file" accept="image/*" onChange={e => e.target.files[0] && onPhotoChange(e.target.files[0])}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }} />
+        {data.photo && <img src={data.photo} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '50%', marginTop: '8px', border: '2px solid var(--primary)' }} />}
+      </div>
+    </div>
+  )
+}
 
 function StaffTab({ dbData, updateDb }) {
   const staff = dbData.staff || []
@@ -664,27 +685,6 @@ function StaffTab({ dbData, updateDb }) {
     await updateDb({ staff: staff.filter(m => m.id !== id) })
   }
 
-  function StaffForm({ data, setData }) {
-    return (
-      <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
-        {grid2(<>
-          <FieldInput label="Name" value={data.name || ''} onChange={v => setData(p => ({ ...p, name: v }))} />
-          <FieldInput label="Role" value={data.role || ''} onChange={v => setData(p => ({ ...p, role: v }))} />
-          <FieldInput label="Discord" value={data.discord || ''} onChange={v => setData(p => ({ ...p, discord: v }))} />
-        </>)}
-        <FieldTextarea label="Bio" value={data.bio || ''} onChange={v => setData(p => ({ ...p, bio: v }))} rows={2} />
-        <div>
-          <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '5px' }}>
-            Photo (300px / 0.72q)
-          </label>
-          <input type="file" accept="image/*" onChange={e => e.target.files[0] && handlePhoto(e.target.files[0], setData)}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }} />
-          {data.photo && <img src={data.photo} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '50%', marginTop: '8px', border: '2px solid var(--primary)' }} />}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
@@ -693,7 +693,7 @@ function StaffTab({ dbData, updateDb }) {
       <AnimatePresence>
         {adding && (
           <EditBox>
-            <StaffForm data={newItem} setData={setNewItem} />
+            <StaffForm data={newItem} setData={setNewItem} onPhotoChange={f => handlePhoto(f, setNewItem)} />
             <div style={{ display: 'flex', gap: '8px' }}>
               <SaveBtn onClick={addItem} label="Add Member" />
               <CancelBtn onClick={() => setAdding(false)} />
@@ -719,7 +719,7 @@ function StaffTab({ dbData, updateDb }) {
             <AnimatePresence>
               {editing === m.id && (
                 <EditBox>
-                  <StaffForm data={editData} setData={setEditData} />
+                  <StaffForm data={editData} setData={setEditData} onPhotoChange={f => handlePhoto(f, setEditData)} />
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <SaveBtn onClick={saveEdit} />
                     <CancelBtn onClick={() => setEditing(null)} />
@@ -735,6 +735,27 @@ function StaffTab({ dbData, updateDb }) {
 }
 
 // ─── Sponsors Tab ─────────────────────────────────────────────────────────────
+
+function SponsorForm({ data, setData, onLogoChange }) {
+  return (
+    <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+      {grid2(<>
+        <FieldInput label="Company Name" value={data.name || ''} onChange={v => setData(p => ({ ...p, name: v }))} />
+        <FieldSelect label="Tier" value={data.tier || 'Community'} onChange={v => setData(p => ({ ...p, tier: v }))} options={TIERS} />
+        <FieldSelect label="Partnership Type" value={data.type || PARTNERSHIP_TYPES[0]} onChange={v => setData(p => ({ ...p, type: v }))} options={PARTNERSHIP_TYPES} />
+      </>)}
+      <FieldTextarea label="Description" value={data.description || ''} onChange={v => setData(p => ({ ...p, description: v }))} rows={2} />
+      <div>
+        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '5px' }}>
+          Logo (400px / 0.85q)
+        </label>
+        <input type="file" accept="image/*" onChange={e => e.target.files[0] && onLogoChange(e.target.files[0])}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }} />
+        {data.logo && <img src={data.logo} style={{ maxWidth: '120px', maxHeight: '60px', objectFit: 'contain', marginTop: '8px', border: '1px solid var(--border)' }} />}
+      </div>
+    </div>
+  )
+}
 
 function SponsorsTab({ dbData, updateDb }) {
   const sponsors = dbData.sponsors || []
@@ -769,27 +790,6 @@ function SponsorsTab({ dbData, updateDb }) {
     await updateDb({ sponsors: sponsors.filter(s => s.id !== id) })
   }
 
-  function SponsorForm({ data, setData }) {
-    return (
-      <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
-        {grid2(<>
-          <FieldInput label="Company Name" value={data.name || ''} onChange={v => setData(p => ({ ...p, name: v }))} />
-          <FieldSelect label="Tier" value={data.tier || 'Community'} onChange={v => setData(p => ({ ...p, tier: v }))} options={TIERS} />
-          <FieldSelect label="Partnership Type" value={data.type || PARTNERSHIP_TYPES[0]} onChange={v => setData(p => ({ ...p, type: v }))} options={PARTNERSHIP_TYPES} />
-        </>)}
-        <FieldTextarea label="Description" value={data.description || ''} onChange={v => setData(p => ({ ...p, description: v }))} rows={2} />
-        <div>
-          <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '5px' }}>
-            Logo (400px / 0.85q)
-          </label>
-          <input type="file" accept="image/*" onChange={e => e.target.files[0] && handleLogo(e.target.files[0], setData)}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }} />
-          {data.logo && <img src={data.logo} style={{ maxWidth: '120px', maxHeight: '60px', objectFit: 'contain', marginTop: '8px', border: '1px solid var(--border)' }} />}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
@@ -798,7 +798,7 @@ function SponsorsTab({ dbData, updateDb }) {
       <AnimatePresence>
         {adding && (
           <EditBox>
-            <SponsorForm data={newItem} setData={setNewItem} />
+            <SponsorForm data={newItem} setData={setNewItem} onLogoChange={f => handleLogo(f, setNewItem)} />
             <div style={{ display: 'flex', gap: '8px' }}>
               <SaveBtn onClick={addItem} label="Add Sponsor" />
               <CancelBtn onClick={() => setAdding(false)} />
@@ -824,7 +824,7 @@ function SponsorsTab({ dbData, updateDb }) {
             <AnimatePresence>
               {editing === s.id && (
                 <EditBox>
-                  <SponsorForm data={editData} setData={setEditData} />
+                  <SponsorForm data={editData} setData={setEditData} onLogoChange={f => handleLogo(f, setEditData)} />
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <SaveBtn onClick={saveEdit} />
                     <CancelBtn onClick={() => setEditing(null)} />
@@ -1041,6 +1041,22 @@ function ResultsTab({ dbData, updateDb }) {
 
 // ─── Standings Tab ────────────────────────────────────────────────────────────
 
+function StandingForm({ data, setData }) {
+  return (
+    <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+      {grid2(<>
+        <FieldInput label="Driver Name" value={data.driver || ''} onChange={v => setData(p => ({ ...p, driver: v }))} />
+        <FieldInput label="Nationality" value={data.nationality || ''} onChange={v => setData(p => ({ ...p, nationality: v }))} placeholder="United Kingdom" />
+        <FieldInput label="Flag Emoji" value={data.flag || ''} onChange={v => setData(p => ({ ...p, flag: v }))} placeholder="🇬🇧" />
+        <FieldInput label="Points" value={data.points || ''} onChange={v => setData(p => ({ ...p, points: v }))} placeholder="0" />
+        <FieldInput label="Wins" value={data.wins || ''} onChange={v => setData(p => ({ ...p, wins: v }))} placeholder="0" />
+        <FieldInput label="Podiums" value={data.podiums || ''} onChange={v => setData(p => ({ ...p, podiums: v }))} placeholder="0" />
+        <FieldInput label="Fastest Laps" value={data.fastestLaps || ''} onChange={v => setData(p => ({ ...p, fastestLaps: v }))} placeholder="0" />
+      </>)}
+    </div>
+  )
+}
+
 function StandingsTab({ dbData, updateDb }) {
   const standings = dbData.standings || []
   const results = dbData.results || []
@@ -1094,22 +1110,6 @@ function StandingsTab({ dbData, updateDb }) {
     })
     await updateDb({ standings: next })
     showToast('Standings recalculated from results')
-  }
-
-  function StandingForm({ data, setData }) {
-    return (
-      <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
-        {grid2(<>
-          <FieldInput label="Driver Name" value={data.driver || ''} onChange={v => setData(p => ({ ...p, driver: v }))} />
-          <FieldInput label="Nationality" value={data.nationality || ''} onChange={v => setData(p => ({ ...p, nationality: v }))} placeholder="United Kingdom" />
-          <FieldInput label="Flag Emoji" value={data.flag || ''} onChange={v => setData(p => ({ ...p, flag: v }))} placeholder="🇬🇧" />
-          <FieldInput label="Points" value={data.points || ''} onChange={v => setData(p => ({ ...p, points: v }))} placeholder="0" />
-          <FieldInput label="Wins" value={data.wins || ''} onChange={v => setData(p => ({ ...p, wins: v }))} placeholder="0" />
-          <FieldInput label="Podiums" value={data.podiums || ''} onChange={v => setData(p => ({ ...p, podiums: v }))} placeholder="0" />
-          <FieldInput label="Fastest Laps" value={data.fastestLaps || ''} onChange={v => setData(p => ({ ...p, fastestLaps: v }))} placeholder="0" />
-        </>)}
-      </div>
-    )
   }
 
   const sorted = [...standings].sort((a, b) => Number(b.points) - Number(a.points))
