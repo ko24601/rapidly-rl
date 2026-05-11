@@ -83,7 +83,8 @@ function DriverCard({ driver, index }) {
 }
 
 export default function DriversPage() {
-  const { drivers, loading } = useDatabase()
+  const { drivers: rawDrivers, loading } = useDatabase()
+  const drivers = [...rawDrivers].sort((a, b) => (a.category || '').localeCompare(b.category || ''))
 
   return (
     <>

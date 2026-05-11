@@ -58,7 +58,8 @@ function DriverCard({ driver, index }) {
 
 export default function Drivers() {
   const { drivers, loading } = useDatabase()
-  const preview = drivers.slice(0, 4)
+  const sorted = [...drivers].sort((a, b) => (a.category || '').localeCompare(b.category || ''))
+  const preview = sorted.slice(0, 4)
 
   if (!loading && drivers.length === 0) return null
 
@@ -76,12 +77,7 @@ export default function Drivers() {
               <div className="section-underline" />
             </div>
             <Link to="/drivers"
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '2px',
-                color: 'var(--primary)', textTransform: 'uppercase', textDecoration: 'none',
-                border: '1px solid rgba(57,255,20,0.3)', padding: '8px 20px',
-                transition: 'all 0.2s', whiteSpace: 'nowrap',
-              }}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '2px', color: 'var(--primary)', textTransform: 'uppercase', textDecoration: 'none', border: '1px solid rgba(57,255,20,0.3)', padding: '8px 20px', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(57,255,20,0.08)'; e.currentTarget.style.boxShadow = '0 0 16px rgba(57,255,20,0.2)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = 'none' }}
             >
@@ -100,11 +96,7 @@ export default function Drivers() {
         {!loading && drivers.length > 4 && (
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} style={{ textAlign: 'center', marginTop: '32px' }}>
             <Link to="/drivers"
-              style={{
-                fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px', letterSpacing: '2px',
-                textTransform: 'uppercase', color: '#050505', background: 'var(--primary)',
-                padding: '12px 36px', textDecoration: 'none', display: 'inline-block', transition: 'opacity 0.2s',
-              }}
+              style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px', letterSpacing: '2px', textTransform: 'uppercase', color: '#050505', background: 'var(--primary)', padding: '12px 36px', textDecoration: 'none', display: 'inline-block', transition: 'opacity 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
