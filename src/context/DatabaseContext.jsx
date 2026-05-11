@@ -1,13 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { db } from '../firebase.js'
-import {
-  doc,
-  getDoc,
-  setDoc,
-  collection,
-  getDocs,
-  deleteDoc,
-} from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 
 const DEFAULT_DB = {
   news: [],
@@ -19,13 +12,13 @@ const DEFAULT_DB = {
   results: [],
   standings: [],
   gallery: [],
+  drivers: [],
 }
 
 const DatabaseContext = createContext(null)
 
 export function DatabaseProvider({ children }) {
   const [dbData, setDbData] = useState(DEFAULT_DB)
-  const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,13 +29,8 @@ export function DatabaseProvider({ children }) {
         if (snap.exists()) {
           setDbData({ ...DEFAULT_DB, ...snap.data() })
         }
-
-        const driversSnap = await getDocs(collection(db, 'drivers'))
-        const driverList = []
-        driversSnap.forEach((d) => driverList.push({ id: d.id, ...d.data() }))
-        setDrivers(driverList)
       } catch (err) {
-        console.warn('Firebase load error (check your config):', err.message)
+        console.warn('Firebase load error:', err.message)
       } finally {
         setLoading(false)
       }
@@ -60,26 +48,21 @@ export function DatabaseProvider({ children }) {
     }
   }
 
+  const drivers = dbData.drivers || []
+
   async function saveDriver(id, data) {
-    try {
-      await setDoc(doc(db, 'drivers', id), data)
-      setDrivers((prev) => {
-        const exists = prev.find((d) => d.id === id)
-        if (exists) return prev.map((d) => (d.id === id ? { id, ...data } : d))
-        return [...prev, { id, ...data }]
-      })
-    } catch (err) {
-      console.warn('Driver save error:', err.message)
+    const existing = drivers.find(d => d.id === id)
+    let next
+    if (existing) {
+      next = drivers.map(d => d.id === id ? { id, ...data } : d)
+    } else {
+      next = [...drivers, { id, ...data }]
     }
+    await updateDb({ drivers: next })
   }
 
   async function deleteDriver(id) {
-    try {
-      await deleteDoc(doc(db, 'drivers', id))
-      setDrivers((prev) => prev.filter((d) => d.id !== id))
-    } catch (err) {
-      console.warn('Driver delete error:', err.message)
-    }
+    await updateDb({ drivers: drivers.filter(d => d.id !== id) })
   }
 
   return (
