@@ -121,10 +121,12 @@ export default function Hero() {
           {SITE.tagline}
         </motion.div>
 
-        {/* Name */}
+        {/* Name + glitch */}
         <div style={{ position: 'relative', marginBottom: '28px' }}>
+          <span aria-hidden="true" style={{ position: 'absolute', inset: 0, fontFamily: 'var(--font-heading)', fontWeight: 900, fontSize: 'clamp(56px, 11vw, 128px)', letterSpacing: '-2px', textTransform: 'uppercase', lineHeight: 0.88, color: 'var(--primary)', opacity: 0.65, animation: 'glitch1 8s infinite', pointerEvents: 'none' }}>{name}</span>
+          <span aria-hidden="true" style={{ position: 'absolute', inset: 0, fontFamily: 'var(--font-heading)', fontWeight: 900, fontSize: 'clamp(56px, 11vw, 128px)', letterSpacing: '-2px', textTransform: 'uppercase', lineHeight: 0.88, color: '#ff3333', opacity: 0.4, animation: 'glitch2 8s infinite 0.4s', pointerEvents: 'none' }}>{name}</span>
           <motion.h1 initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fontFamily: 'var(--font-heading)', fontWeight: 900, fontSize: 'clamp(56px, 11vw, 128px)', letterSpacing: '-2px', textTransform: 'uppercase', lineHeight: 0.88, color: 'var(--text)' }}>
+            style={{ fontFamily: 'var(--font-heading)', fontWeight: 900, fontSize: 'clamp(56px, 11vw, 128px)', letterSpacing: '-2px', textTransform: 'uppercase', lineHeight: 0.88, color: 'var(--text)', animation: 'neonFlicker 12s infinite 4s' }}>
             {name}
           </motion.h1>
         </div>
