@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import { SITE } from './config.js'
 import { DatabaseProvider } from './context/DatabaseContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import { ThemeProvider } from './context/ThemeContext.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
 import Navbar from './components/Navbar.jsx'
 import MobileNav from './components/MobileNav.jsx'
@@ -10,6 +11,7 @@ import Home from './pages/Home.jsx'
 import Sponsors from './pages/Sponsors.jsx'
 import Admin from './pages/Admin.jsx'
 import DriversPage from './pages/DriversPage.jsx'
+import DriverComparison from './pages/DriverComparison.jsx'
 import './styles/global.css'
 
 export default function App() {
@@ -41,6 +43,7 @@ export default function App() {
   }, [])
 
   return (
+    <ThemeProvider>
     <DatabaseProvider>
       <ToastProvider>
         <AnnouncementBanner />
@@ -48,11 +51,13 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/drivers" element={<DriversPage />} />
+          <Route path="/compare" element={<DriverComparison />} />
           <Route path="/sponsors" element={<Sponsors />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
         <MobileNav />
       </ToastProvider>
     </DatabaseProvider>
+    </ThemeProvider>
   )
 }

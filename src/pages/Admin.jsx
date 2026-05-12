@@ -529,6 +529,26 @@ function DriverForm({ data, setData, onPhotoChange }) {
         <FieldInput label="Discord" value={data.discord || ''} onChange={v => setData(p => ({ ...p, discord: v }))} />
       </>)}
       <FieldTextarea label="Bio" value={data.bio || ''} onChange={v => setData(p => ({ ...p, bio: v }))} rows={2} />
+      {grid2(<>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)' }}>Team Colour</label>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input type="color" value={data.teamColor || '#39FF14'} onChange={e => setData(p => ({ ...p, teamColor: e.target.value }))}
+              style={{ width: '40px', height: '36px', border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', padding: '2px' }} />
+            <input type="text" value={data.teamColor || ''} onChange={e => setData(p => ({ ...p, teamColor: e.target.value }))} placeholder="#39FF14"
+              style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '13px', padding: '8px 10px', outline: 'none' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)' }}>Helmet Colour</label>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input type="color" value={data.helmetColor || '#39FF14'} onChange={e => setData(p => ({ ...p, helmetColor: e.target.value }))}
+              style={{ width: '40px', height: '36px', border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', padding: '2px' }} />
+            <input type="text" value={data.helmetColor || ''} onChange={e => setData(p => ({ ...p, helmetColor: e.target.value }))} placeholder="#39FF14"
+              style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '13px', padding: '8px 10px', outline: 'none' }} />
+          </div>
+        </div>
+      </>)}
       <div>
         <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: '5px' }}>
           Photo (will be compressed to 480px)
