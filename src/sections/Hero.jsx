@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { SITE } from '../config.js'
 
 const BASE = import.meta.env.BASE_URL
@@ -148,6 +149,10 @@ export default function Hero() {
             style={{ fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '13px', letterSpacing: '2px', textTransform: 'uppercase', padding: '15px 36px', background: 'transparent', color: 'var(--text)', border: '2px solid rgba(255,255,255,0.18)', cursor: 'pointer' }}>
             View Schedule →
           </button>
+          <Link to="/game"
+            style={{ fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '13px', letterSpacing: '2px', textTransform: 'uppercase', padding: '15px 36px', background: 'transparent', color: 'var(--primary)', border: '2px solid rgba(57,255,20,0.35)', textDecoration: 'none', display: 'inline-block' }}>
+            Play Game 🎮
+          </Link>
         </motion.div>
       </div>
 

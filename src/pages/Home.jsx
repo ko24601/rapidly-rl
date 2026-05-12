@@ -8,8 +8,6 @@ import Standings from '../sections/Standings.jsx'
 import Gallery from '../sections/Gallery.jsx'
 import StatBar from '../components/StatBar.jsx'
 import SectionDivider from '../components/SectionDivider.jsx'
-import Footer from '../components/Footer.jsx'
-
 export default function Home() {
   return (
     <>
@@ -55,8 +53,6 @@ export default function Home() {
 
         <Gallery />
       </main>
-
-      <Footer />
     </>
   )
 }
