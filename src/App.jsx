@@ -3,15 +3,16 @@ import { Routes, Route } from 'react-router-dom'
 import { SITE } from './config.js'
 import { DatabaseProvider } from './context/DatabaseContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
-import { ThemeProvider } from './context/ThemeContext.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
 import Navbar from './components/Navbar.jsx'
 import MobileNav from './components/MobileNav.jsx'
+import Footer from './components/Footer.jsx'
 import Home from './pages/Home.jsx'
 import Sponsors from './pages/Sponsors.jsx'
 import Admin from './pages/Admin.jsx'
 import DriversPage from './pages/DriversPage.jsx'
 import DriverComparison from './pages/DriverComparison.jsx'
+import GamePage from './pages/GamePage.jsx'
 import './styles/global.css'
 
 export default function App() {
@@ -43,7 +44,6 @@ export default function App() {
   }, [])
 
   return (
-    <ThemeProvider>
     <DatabaseProvider>
       <ToastProvider>
         <AnnouncementBanner />
@@ -54,10 +54,11 @@ export default function App() {
           <Route path="/compare" element={<DriverComparison />} />
           <Route path="/sponsors" element={<Sponsors />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/game" element={<GamePage />} />
         </Routes>
+        <Footer />
         <MobileNav />
       </ToastProvider>
     </DatabaseProvider>
-    </ThemeProvider>
   )
 }

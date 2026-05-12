@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { useTheme } from '../context/ThemeContext.jsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SITE } from '../config.js'
 
@@ -18,7 +17,6 @@ function scrollTo(id) {
 }
 
 export default function Navbar() {
-  const { theme, toggle } = useTheme()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
@@ -97,16 +95,15 @@ export default function Navbar() {
             onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
             onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
           >Drivers</Link>
+          <Link to="/game"
+            style={{ color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500, letterSpacing: '0.5px', padding: '8px 12px', transition: 'color 0.2s', whiteSpace: 'nowrap', textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+          >Game</Link>
         </div>
 
         {/* Desktop Actions */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }} className="desktop-actions">
-          <button onClick={toggle} title="Toggle theme"
-            style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 10px', cursor: 'pointer', fontSize: '15px', transition: 'all 0.2s', borderRadius: '2px' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)' }}>
-            {theme === 'dark' ? '☀' : '🌙'}
-          </button>
           <a href={SITE.discord} target="_blank" rel="noopener noreferrer" style={btnStyle('ghost')}>Join Discord</a>
           <Link to="/sponsors" style={btnStyle('ghost')}>Become a Sponsor</Link>
           <Link to="/admin" style={btnStyle('primary')}>Admin</Link>
@@ -149,6 +146,10 @@ export default function Navbar() {
               <Link to="/drivers" onClick={() => setOpen(false)}
                 style={{ color: 'var(--text)', fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', textAlign: 'left', padding: '10px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none', display: 'block' }}>
                 Drivers
+              </Link>
+              <Link to="/game" onClick={() => setOpen(false)}
+                style={{ color: 'var(--text)', fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', textAlign: 'left', padding: '10px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none', display: 'block' }}>
+                Game
               </Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '24px' }}>
