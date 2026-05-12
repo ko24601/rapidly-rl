@@ -3,110 +3,186 @@ import { Link } from 'react-router-dom'
 import { db } from '../firebase.js'
 import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 
-const W = 900
-const H = 560
-const TRACK_W = 68
-const MAX_SPEED = 5.2
-const ACCEL = 0.12
-const BRAKE = 0.18
-const FRICTION = 0.97
-const STEER = 0.038
-const CAR_W = 14
-const CAR_H = 24
+// ─── constants ────────────────────────────────────────────────────────────────
+const CW = 900, CH = 540
+const TRACK_HALF = 48
+const MAX_SPD = 8
+const ACCEL = 0.18
+const BRAKE_F = 0.32
+const FRICTION = 0.968
+const LAT_GRIP = 0.78      // lower = more drift
+const STEER_RATE = 0.055
+const TOTAL_LAPS = 3
 
-// Centerline points (closed loop — last point connects back to first)
-const CL = [
-  [450, 510], [620, 510], [720, 510], [800, 480],
-  [830, 420], [830, 300], [830, 200], [800, 130],
-  [730, 95],  [630, 85],  [500, 85],  [360, 85],
-  [230, 85],  [150, 110], [100, 175], [95, 260],
-  [110, 350], [90, 420],  [120, 490], [200, 520],
-  [320, 520], [450, 510],
+// ─── track centerline (world coords) ─────────────────────────────────────────
+// A flowing ~F1-style circuit, designed to be fun to drive
+const RAW_TRACK = [
+  [1080, 820], [880, 820], [680, 820], [480, 820],
+  [320, 780],  [210, 680], [190, 560], [210, 440],
+  [290, 340],  [410, 270], [560, 250], [700, 270],
+  [820, 340],  [900, 280], [990, 220], [1110, 210],
+  [1230, 250], [1320, 360],[1340, 490],[1300, 610],
+  [1210, 700], [1150, 760],[1080, 820],
 ]
 
-// Catmull-Rom → cubic Bézier segments
-function buildSpline(pts) {
-  const segs = []
-  const n = pts.length
-  for (let i = 0; i < n - 1; i++) {
+// ─── catmull-rom spline sampler ───────────────────────────────────────────────
+function sampleCatmull(pts, totalSamples) {
+  const n = pts.length - 1
+  const out = []
+  for (let i = 0; i < n; i++) {
     const p0 = pts[Math.max(0, i - 1)]
     const p1 = pts[i]
     const p2 = pts[i + 1]
-    const p3 = pts[Math.min(n - 1, i + 2)]
-    segs.push({
-      x1: p1[0], y1: p1[1],
-      cx1: p1[0] + (p2[0] - p0[0]) / 6,
-      cy1: p1[1] + (p2[1] - p0[1]) / 6,
-      cx2: p2[0] - (p3[0] - p1[0]) / 6,
-      cy2: p2[1] - (p3[1] - p1[1]) / 6,
-      x2: p2[0], y2: p2[1],
-    })
+    const p3 = pts[Math.min(n, i + 2)]
+    const steps = Math.ceil(totalSamples / n)
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps
+      const t2 = t * t, t3 = t2 * t
+      const x = 0.5 * ((2*p1[0]) + (-p0[0]+p2[0])*t + (2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2 + (-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3)
+      const y = 0.5 * ((2*p1[1]) + (-p0[1]+p2[1])*t + (2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2 + (-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)
+      out.push([x, y])
+    }
   }
-  return segs
+  return out
 }
 
-const SPLINE = buildSpline(CL)
+const SMOOTH_TRACK = sampleCatmull([...RAW_TRACK, RAW_TRACK[0], RAW_TRACK[1]], 400)
+// Waypoints: every 20th sample point
+const WAYPOINTS = SMOOTH_TRACK.filter((_, i) => i % 20 === 0)
 
-function drawTrack(ctx, forCollision = false) {
-  // Tarmac
-  ctx.save()
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
+// ─── nearest point on polyline ────────────────────────────────────────────────
+function nearestOnTrack(px, py) {
+  let best = Infinity, bx = px, by = py
+  for (let i = 0; i < SMOOTH_TRACK.length; i++) {
+    const [ax, ay] = SMOOTH_TRACK[i]
+    const [bx2, by2] = SMOOTH_TRACK[(i + 1) % SMOOTH_TRACK.length]
+    const dx = bx2 - ax, dy = by2 - ay
+    const len2 = dx*dx + dy*dy
+    if (len2 === 0) continue
+    const t = Math.max(0, Math.min(1, ((px - ax)*dx + (py - ay)*dy) / len2))
+    const cx = ax + t*dx, cy = ay + t*dy
+    const d = Math.hypot(px - cx, py - cy)
+    if (d < best) { best = d; bx = cx; by = cy }
+  }
+  return { dist: best, nx: bx, ny: by }
+}
 
-  ctx.beginPath()
-  ctx.moveTo(SPLINE[0].x1, SPLINE[0].y1)
-  for (const s of SPLINE) ctx.bezierCurveTo(s.cx1, s.cy1, s.cx2, s.cy2, s.x2, s.y2)
-  ctx.strokeStyle = forCollision ? '#fff' : '#222'
-  ctx.lineWidth = TRACK_W
-  ctx.stroke()
+// ─── helpers ──────────────────────────────────────────────────────────────────
+function formatTime(ms) {
+  if (ms == null) return '--:--.---'
+  const m = Math.floor(ms / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  const ms3 = ms % 1000
+  return `${m}:${String(s).padStart(2,'0')}.${String(ms3).padStart(3,'0')}`
+}
 
-  if (!forCollision) {
-    // White edge lines
-    ctx.beginPath()
-    ctx.moveTo(SPLINE[0].x1, SPLINE[0].y1)
-    for (const s of SPLINE) ctx.bezierCurveTo(s.cx1, s.cy1, s.cx2, s.cy2, s.x2, s.y2)
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)'
-    ctx.lineWidth = TRACK_W
-    ctx.stroke()
+// ─── draw functions ───────────────────────────────────────────────────────────
+function drawWorld(ctx, carX, carY) {
+  // Background (grass)
+  ctx.fillStyle = '#0d1a0a'
+  ctx.fillRect(-2000, -2000, 6000, 6000)
 
-    // Inner kerb line
-    ctx.beginPath()
-    ctx.moveTo(SPLINE[0].x1, SPLINE[0].y1)
-    for (const s of SPLINE) ctx.bezierCurveTo(s.cx1, s.cy1, s.cx2, s.cy2, s.x2, s.y2)
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)'
-    ctx.lineWidth = TRACK_W - 8
-    ctx.stroke()
-
-    // Track surface
-    ctx.beginPath()
-    ctx.moveTo(SPLINE[0].x1, SPLINE[0].y1)
-    for (const s of SPLINE) ctx.bezierCurveTo(s.cx1, s.cy1, s.cx2, s.cy2, s.x2, s.y2)
-    ctx.strokeStyle = '#1a1a1a'
-    ctx.lineWidth = TRACK_W - 10
-    ctx.stroke()
-
-    // Dashed centre line
-    ctx.setLineDash([18, 14])
-    ctx.beginPath()
-    ctx.moveTo(SPLINE[0].x1, SPLINE[0].y1)
-    for (const s of SPLINE) ctx.bezierCurveTo(s.cx1, s.cy1, s.cx2, s.cy2, s.x2, s.y2)
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)'
-    ctx.lineWidth = 1.5
-    ctx.stroke()
-    ctx.setLineDash([])
-
-    // Start/finish line
-    ctx.fillStyle = '#fff'
-    for (let i = 0; i < 6; i++) {
-      ctx.fillRect(430 + i * 8, 500, 4, 20)
-    }
-    for (let i = 0; i < 6; i++) {
-      ctx.fillStyle = i % 2 === 0 ? '#fff' : '#000'
-      ctx.fillRect(430 + i * 8, 500, 4, 10)
-      ctx.fillStyle = i % 2 === 0 ? '#000' : '#fff'
-      ctx.fillRect(430 + i * 8, 510, 4, 10)
+  // Grass texture dots
+  ctx.fillStyle = 'rgba(30,60,20,0.4)'
+  for (let gx = -400; gx < 2000; gx += 80) {
+    for (let gy = -400; gy < 1400; gy += 80) {
+      ctx.fillRect(gx, gy, 1, 1)
     }
   }
+
+  // ── track shadow ──
+  ctx.save()
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+  ctx.lineWidth = TRACK_HALF * 2 + 10
+  ctx.stroke()
+
+  // ── kerb (outer) ──
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = '#cc2200'
+  ctx.lineWidth = TRACK_HALF * 2 + 6
+  ctx.stroke()
+
+  // ── kerb white stripes ──
+  ctx.setLineDash([22, 22])
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = TRACK_HALF * 2 + 6
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  // ── tarmac ──
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = '#1c1c1e'
+  ctx.lineWidth = TRACK_HALF * 2
+  ctx.stroke()
+
+  // ── track surface detail ──
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = '#212124'
+  ctx.lineWidth = TRACK_HALF * 2 - 4
+  ctx.stroke()
+
+  // ── white edge lines ──
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+  ctx.lineWidth = TRACK_HALF * 2 - 2
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = '#1c1c1e'
+  ctx.lineWidth = TRACK_HALF * 2 - 6
+  ctx.stroke()
+
+  // ── dashed centre line ──
+  ctx.save()
+  ctx.setLineDash([28, 22])
+  ctx.beginPath()
+  ctx.moveTo(SMOOTH_TRACK[0][0], SMOOTH_TRACK[0][1])
+  for (const [x,y] of SMOOTH_TRACK) ctx.lineTo(x, y)
+  ctx.closePath()
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  ctx.restore()
+
+  // ── start/finish line ──
+  const [sx, sy] = SMOOTH_TRACK[0]
+  const [nx, ny] = SMOOTH_TRACK[1]
+  const a = Math.atan2(ny - sy, nx - sx) + Math.PI / 2
+  ctx.save()
+  ctx.translate(sx, sy)
+  ctx.rotate(a)
+  for (let i = -4; i < 5; i++) {
+    ctx.fillStyle = (i % 2 === 0) ? '#fff' : '#111'
+    ctx.fillRect(i * 8 - 4, -TRACK_HALF, 8, TRACK_HALF / 2)
+    ctx.fillStyle = (i % 2 === 0) ? '#111' : '#fff'
+    ctx.fillRect(i * 8 - 4, -TRACK_HALF / 2, 8, TRACK_HALF / 2)
+  }
+  ctx.restore()
+
   ctx.restore()
 }
 
@@ -115,268 +191,269 @@ function drawCar(ctx, x, y, angle, speed) {
   ctx.translate(x, y)
   ctx.rotate(angle)
 
+  // Speed-based glow
+  if (speed > 2) {
+    ctx.shadowColor = '#39FF14'
+    ctx.shadowBlur = 6 + speed * 4
+  }
+
   // Body
-  const grad = ctx.createLinearGradient(0, -CAR_H / 2, 0, CAR_H / 2)
-  grad.addColorStop(0, '#39FF14')
-  grad.addColorStop(0.5, '#2adb0f')
-  grad.addColorStop(1, '#1a9a08')
-  ctx.fillStyle = grad
+  const g = ctx.createLinearGradient(0, -13, 0, 13)
+  g.addColorStop(0, '#39FF14')
+  g.addColorStop(0.5, '#28cc0e')
+  g.addColorStop(1, '#1a8a08')
+  ctx.fillStyle = g
   ctx.beginPath()
-  ctx.roundRect(-CAR_W / 2, -CAR_H / 2, CAR_W, CAR_H, 3)
+  ctx.roundRect(-7, -13, 14, 26, 3)
   ctx.fill()
+  ctx.shadowBlur = 0
 
   // Cockpit
-  ctx.fillStyle = '#050505'
+  ctx.fillStyle = '#060606'
   ctx.beginPath()
-  ctx.roundRect(-4, -8, 8, 12, 2)
+  ctx.roundRect(-4, -5, 8, 11, 2)
   ctx.fill()
 
-  // Nose
+  // Nose cone
   ctx.fillStyle = '#39FF14'
   ctx.beginPath()
-  ctx.moveTo(-3, -CAR_H / 2 - 6)
-  ctx.lineTo(3, -CAR_H / 2 - 6)
-  ctx.lineTo(CAR_W / 2, -CAR_H / 2)
-  ctx.lineTo(-CAR_W / 2, -CAR_H / 2)
+  ctx.moveTo(-3, -13)
+  ctx.lineTo(3, -13)
+  ctx.lineTo(2, -20)
+  ctx.lineTo(-2, -20)
   ctx.closePath()
   ctx.fill()
 
-  // Rear wing
-  ctx.fillStyle = '#222'
-  ctx.fillRect(-CAR_W / 2 - 3, CAR_H / 2 - 4, CAR_W + 6, 3)
-
   // Front wing
-  ctx.fillStyle = '#222'
-  ctx.fillRect(-CAR_W / 2 - 2, -CAR_H / 2 - 1, CAR_W + 4, 2)
+  ctx.fillStyle = '#1a1a1a'
+  ctx.fillRect(-10, -14, 20, 3)
 
-  // Wheels
+  // Rear wing
   ctx.fillStyle = '#111'
-  const wheels = [[-CAR_W / 2 - 3, -CAR_H / 2 + 3], [CAR_W / 2 - 1, -CAR_H / 2 + 3],
-                  [-CAR_W / 2 - 3, CAR_H / 2 - 8], [CAR_W / 2 - 1, CAR_H / 2 - 8]]
-  wheels.forEach(([wx, wy]) => {
-    ctx.fillRect(wx, wy, 4, 5)
-  })
+  ctx.fillRect(-11, 11, 22, 3)
 
-  // Speed glow
-  if (speed > 2) {
-    ctx.shadowColor = '#39FF14'
-    ctx.shadowBlur = 8 + speed * 3
-    ctx.fillStyle = 'rgba(57,255,20,0.15)'
-    ctx.beginPath()
-    ctx.roundRect(-CAR_W / 2 - 1, -CAR_H / 2 - 1, CAR_W + 2, CAR_H + 2, 3)
-    ctx.fill()
-    ctx.shadowBlur = 0
-  }
+  // Wheels (4)
+  ctx.fillStyle = '#111'
+  ;[[-10,-10],[ 6,-10],[-10, 6],[ 6, 6]].forEach(([wx,wy]) => {
+    ctx.fillRect(wx, wy, 4, 6)
+    ctx.strokeStyle = '#333'
+    ctx.lineWidth = 0.5
+    ctx.strokeRect(wx, wy, 4, 6)
+  })
 
   ctx.restore()
 }
 
-function formatTime(ms) {
-  if (!ms && ms !== 0) return '--:--.---'
-  const m = Math.floor(ms / 60000)
-  const s = Math.floor((ms % 60000) / 1000)
-  const ms3 = ms % 1000
-  return `${m}:${String(s).padStart(2, '0')}.${String(ms3).padStart(3, '0')}`
+function drawMinimap(ctx, carX, carY, carAngle, lap) {
+  const MX = CW - 130, MY = 10, MW = 120, MH = 80
+  const WX = 190, WY = 170, WW = 1200, WH = 700
+
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.75)'
+  ctx.strokeStyle = 'rgba(57,255,20,0.3)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.roundRect(MX - 4, MY - 4, MW + 8, MH + 8, 4)
+  ctx.fill(); ctx.stroke()
+
+  ctx.beginPath()
+  SMOOTH_TRACK.forEach(([x,y], i) => {
+    const mx = MX + ((x - WX) / WW) * MW
+    const my = MY + ((y - WY) / WH) * MH
+    i === 0 ? ctx.moveTo(mx, my) : ctx.lineTo(mx, my)
+  })
+  ctx.closePath()
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+  ctx.lineWidth = 3
+  ctx.stroke()
+
+  const cx = MX + ((carX - WX) / WW) * MW
+  const cy = MY + ((carY - WY) / WH) * MH
+  ctx.fillStyle = '#39FF14'
+  ctx.shadowColor = '#39FF14'; ctx.shadowBlur = 6
+  ctx.beginPath()
+  ctx.arc(cx, cy, 3, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.shadowBlur = 0
+
+  ctx.restore()
 }
 
+// ─── main component ───────────────────────────────────────────────────────────
 export default function GamePage() {
   const canvasRef = useRef(null)
-  const offscreenRef = useRef(null)
-  const stateRef = useRef({
-    x: 450, y: 490, angle: Math.PI, speed: 0,
-    keys: {}, lap: 0, lapStart: null, lastLap: null, bestLap: null,
-    crossedLine: false, gameStarted: false, finished: false,
+  const gsRef = useRef({
+    x: 1080, y: 790, vx: 0, vy: 0, angle: Math.PI,
+    camX: 1080, camY: 790,
+    keys: {}, lapCount: 0, lapStart: null, lastLap: null, bestLap: null,
+    nextWP: 0, wpCooldown: 0, started: false, finished: false,
   })
-  const animRef = useRef(null)
+  const rafRef = useRef(null)
 
-  const [display, setDisplay] = useState({ lap: 0, lastLap: null, bestLap: null, speed: 0 })
-  const [gameState, setGameState] = useState('idle') // idle | racing | finished
+  const [phase, setPhase] = useState('idle')  // idle | racing | done
+  const [hud, setHud] = useState({ lap: 0, lastLap: null, bestLap: null, spd: 0, elapsed: 0 })
   const [leaderboard, setLeaderboard] = useState([])
-  const [showSubmit, setShowSubmit] = useState(false)
   const [submitName, setSubmitName] = useState('')
   const [submitTime, setSubmitTime] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [saved, setSaved] = useState(false)
 
-  const fetchLeaderboard = useCallback(async () => {
+  const fetchLB = useCallback(async () => {
     try {
-      const q = query(collection(db, 'game_leaderboard'), orderBy('time', 'asc'), limit(10))
-      const snap = await getDocs(q)
+      const snap = await getDocs(query(collection(db, 'game_leaderboard'), orderBy('time', 'asc'), limit(10)))
       setLeaderboard(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    } catch (e) { console.error(e) }
+    } catch {}
   }, [])
 
-  useEffect(() => { fetchLeaderboard() }, [fetchLeaderboard])
+  useEffect(() => { fetchLB() }, [fetchLB])
 
-  // Build offscreen collision canvas
+  function resetState() {
+    const s = gsRef.current
+    s.x = 1080; s.y = 790; s.vx = 0; s.vy = 0; s.angle = Math.PI
+    s.camX = 1080; s.camY = 790
+    s.lapCount = 0; s.lapStart = null; s.lastLap = null; s.bestLap = null
+    s.nextWP = 0; s.wpCooldown = 0; s.started = false; s.finished = false
+  }
+
+  function startRace() {
+    resetState()
+    setSaved(false)
+    setSubmitTime(null)
+    setSubmitName('')
+    setPhase('racing')
+  }
+
+  // Key handlers
   useEffect(() => {
-    const oc = document.createElement('canvas')
-    oc.width = W; oc.height = H
-    const octx = oc.getContext('2d')
-    octx.fillStyle = '#000'
-    octx.fillRect(0, 0, W, H)
-    drawTrack(octx, true)
-    offscreenRef.current = oc
-  }, [])
-
-  function isOnTrack(x, y) {
-    const oc = offscreenRef.current
-    if (!oc) return true
-    const octx = oc.getContext('2d')
-    const px = octx.getImageData(Math.round(x), Math.round(y), 1, 1).data
-    return px[0] > 128
-  }
-
-  function checkFinishLine(x, y, prevX, prevY, speed) {
-    // Finish line roughly at y=505, x between 425 and 620, moving left (angle ~= Math.PI)
-    const FL_Y = 505
-    const FL_X1 = 425
-    const FL_X2 = 620
-    if (x >= FL_X1 && x <= FL_X2 && ((prevY > FL_Y && y <= FL_Y) || (prevY < FL_Y && y >= FL_Y))) {
-      return speed < 0 // moving in the correct direction (angle ~PI means moving left, y changes from above track)
-        ? false
-        : true
+    if (phase !== 'racing') return
+    const dn = e => {
+      gsRef.current.keys[e.key] = true
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)) e.preventDefault()
     }
-    return false
-  }
-
-  const startGame = useCallback(() => {
-    const s = stateRef.current
-    s.x = 450; s.y = 490; s.angle = Math.PI; s.speed = 0
-    s.lap = 0; s.lapStart = null; s.lastLap = null; s.bestLap = null
-    s.crossedLine = false; s.gameStarted = false; s.finished = false
-    setGameState('racing')
-    setShowSubmit(false)
-    setSubmitted(false)
-  }, [])
+    const up = e => { gsRef.current.keys[e.key] = false }
+    window.addEventListener('keydown', dn)
+    window.addEventListener('keyup', up)
+    return () => { window.removeEventListener('keydown', dn); window.removeEventListener('keyup', up) }
+  }, [phase])
 
   // Game loop
   useEffect(() => {
-    if (gameState !== 'racing') return
+    if (phase !== 'racing') return
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
 
-    const onKey = (e, down) => {
-      stateRef.current.keys[e.key] = down
-      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(e.key)) {
-        e.preventDefault()
-      }
-    }
-    window.addEventListener('keydown', e => onKey(e, true))
-    window.addEventListener('keyup', e => onKey(e, false))
+    function tick() {
+      const s = gsRef.current
+      const k = s.keys
+      const thr = k['ArrowUp'] || k['w'] || k['W']
+      const brk = k['ArrowDown'] || k['s'] || k['S']
+      const lft = k['ArrowLeft'] || k['a'] || k['A']
+      const rgt = k['ArrowRight'] || k['d'] || k['D']
 
-    function loop() {
-      const s = stateRef.current
-      const { keys } = s
+      // ── physics ──
+      const spd = Math.hypot(s.vx, s.vy)
+      const fwd = [Math.cos(s.angle), Math.sin(s.angle)]
+      const lat = [-fwd[1], fwd[0]]
 
-      const throttle = keys['ArrowUp'] || keys['w'] || keys['W']
-      const brake = keys['ArrowDown'] || keys['s'] || keys['S']
-      const left = keys['ArrowLeft'] || keys['a'] || keys['A']
-      const right = keys['ArrowRight'] || keys['d'] || keys['D']
+      if (thr) { s.vx += fwd[0] * ACCEL; s.vy += fwd[1] * ACCEL }
+      if (brk) { s.vx -= fwd[0] * BRAKE_F * 0.5; s.vy -= fwd[1] * BRAKE_F * 0.5 }
 
-      if (throttle) s.speed += ACCEL
-      else if (brake) s.speed -= BRAKE
-      s.speed *= FRICTION
-      s.speed = Math.max(-1.5, Math.min(MAX_SPEED, s.speed))
+      // Friction
+      s.vx *= FRICTION; s.vy *= FRICTION
 
-      const prevX = s.x
-      const prevY = s.y
+      // Lateral grip (project velocity, dampen sideways component)
+      const fwdDot = s.vx * fwd[0] + s.vy * fwd[1]
+      const latDot = s.vx * lat[0] + s.vy * lat[1]
+      s.vx = fwd[0] * fwdDot + lat[0] * latDot * LAT_GRIP
+      s.vy = fwd[1] * fwdDot + lat[1] * latDot * LAT_GRIP
 
-      if (Math.abs(s.speed) > 0.05) {
-        const turnRate = STEER * (Math.abs(s.speed) / MAX_SPEED + 0.3)
-        if (left) s.angle -= turnRate
-        if (right) s.angle += turnRate
-      }
+      // Speed cap
+      const newSpd = Math.hypot(s.vx, s.vy)
+      if (newSpd > MAX_SPD) { s.vx *= MAX_SPD / newSpd; s.vy *= MAX_SPD / newSpd }
 
-      const newX = s.x + Math.cos(s.angle) * s.speed
-      const newY = s.y + Math.sin(s.angle) * s.speed
+      // Steering (speed-dependent)
+      const speedFactor = Math.min(1, newSpd / 2)
+      if (lft) s.angle -= STEER_RATE * speedFactor
+      if (rgt) s.angle += STEER_RATE * speedFactor
 
-      // Collision
-      if (isOnTrack(newX, newY)) {
-        s.x = newX; s.y = newY
+      // Move
+      const nx = s.x + s.vx
+      const ny = s.y + s.vy
+
+      // Collision — push back toward track center
+      const { dist, nx: tnx, ny: tny } = nearestOnTrack(nx, ny)
+      if (dist > TRACK_HALF) {
+        const push = (dist - TRACK_HALF) / dist
+        s.x = nx + (tnx - nx) * push * 1.2
+        s.y = ny + (tny - ny) * push * 1.2
+        // Kill component of velocity pointing away from track
+        const outX = (nx - tnx) / dist, outY = (ny - tny) / dist
+        const outDot = s.vx * outX + s.vy * outY
+        if (outDot > 0) { s.vx -= outDot * outX * 1.4; s.vy -= outDot * outY * 1.4 }
       } else {
-        s.speed *= -0.3
+        s.x = nx; s.y = ny
       }
 
-      // Lap detection — cross finish line going in correct direction (moving left, angle near PI)
-      const onLine = s.y > 495 && s.y < 520 && s.x > 425 && s.x < 620
-      const movingRight = Math.cos(s.angle) < -0.3 // angle near PI = moving left in canvas coords... wait
-
-      // Start line: car starts at x=450, angle=PI (facing left in screen = towards x=320 direction)
-      // Actually angle=PI means cos(PI)=-1, so car moves in -x direction. That's leftward.
-      // Finish line check: car crosses y≈510, x in range, coming from bottom (y was > 510, now < 510... wait
-      // car starts at y=490 which is above 510. Let me re-check start position.
-      // Start pos: x=450, y=490, angle=PI → car moves left
-      // Finish line at y=505-515 range, x=430-620 (the checkered area)
-
-      if (!s.gameStarted) {
-        // Wait for car to first leave the start box
-        if (!(s.x > 425 && s.x < 620 && s.y > 495 && s.y < 525)) {
-          s.gameStarted = true
-        }
-      } else {
-        // Detect crossing finish line: car enters the finish zone from outside
-        const prevOnLine = prevY > 495 && prevY < 525 && prevX > 425 && prevX < 620
-        if (!prevOnLine && onLine) {
+      // ── waypoint / lap system ──
+      if (s.wpCooldown > 0) s.wpCooldown--
+      const wp = WAYPOINTS[s.nextWP]
+      if (Math.hypot(s.x - wp[0], s.y - wp[1]) < 60 && s.wpCooldown === 0) {
+        s.nextWP = (s.nextWP + 1) % WAYPOINTS.length
+        s.wpCooldown = 30
+        if (s.nextWP === 0) {
           const now = Date.now()
-          if (s.lapStart === null) {
+          if (!s.started) {
+            s.started = true
             s.lapStart = now
-            s.lap = 1
+            s.lapCount = 1
           } else {
-            const lapTime = now - s.lapStart
-            if (lapTime > 3000) { // debounce
-              s.lastLap = lapTime
-              if (s.bestLap === null || lapTime < s.bestLap) s.bestLap = lapTime
-              s.lap++
+            const lapT = now - s.lapStart
+            if (lapT > 5000) {
+              s.lastLap = lapT
+              if (!s.bestLap || lapT < s.bestLap) s.bestLap = lapT
               s.lapStart = now
-
-              if (s.lap > 3) {
+              s.lapCount++
+              if (s.lapCount > TOTAL_LAPS) {
                 s.finished = true
-                setGameState('finished')
                 setSubmitTime(s.bestLap)
-                setShowSubmit(true)
+                setPhase('done')
+                return
               }
             }
           }
         }
       }
 
-      setDisplay({ lap: s.lap, lastLap: s.lastLap, bestLap: s.bestLap, speed: Math.abs(s.speed) })
+      // ── camera lerp ──
+      s.camX += (s.x - s.camX) * 0.12
+      s.camY += (s.y - s.camY) * 0.12
 
-      // Draw
-      ctx.fillStyle = '#050505'
-      ctx.fillRect(0, 0, W, H)
+      // ── render ──
+      ctx.clearRect(0, 0, CW, CH)
+      ctx.save()
+      ctx.translate(CW / 2 - s.camX, CH / 2 - s.camY)
+      drawWorld(ctx, s.x, s.y)
+      drawCar(ctx, s.x, s.y, s.angle, newSpd)
+      ctx.restore()
 
-      // Grass texture
-      ctx.fillStyle = '#0a1a08'
-      ctx.fillRect(0, 0, W, H)
+      // Minimap
+      drawMinimap(ctx, s.x, s.y, s.angle, s.lapCount)
 
-      drawTrack(ctx, false)
+      setHud({
+        lap: s.lapCount,
+        lastLap: s.lastLap,
+        bestLap: s.bestLap,
+        spd: Math.round(newSpd * 55),
+        elapsed: s.lapStart ? Date.now() - s.lapStart : 0,
+      })
 
-      // Lap timer display on track
-      if (s.lapStart !== null && !s.finished) {
-        const elapsed = Date.now() - s.lapStart
-        ctx.save()
-        ctx.font = '700 13px "Roboto Mono", monospace'
-        ctx.fillStyle = 'rgba(57,255,20,0.7)'
-        ctx.fillText(formatTime(elapsed), 10, H - 10)
-        ctx.restore()
-      }
-
-      drawCar(ctx, s.x, s.y, s.angle, Math.abs(s.speed))
-
-      animRef.current = requestAnimationFrame(loop)
+      rafRef.current = requestAnimationFrame(tick)
     }
 
-    animRef.current = requestAnimationFrame(loop)
-
-    return () => {
-      cancelAnimationFrame(animRef.current)
-      window.removeEventListener('keydown', e => onKey(e, true))
-      window.removeEventListener('keyup', e => onKey(e, false))
-    }
-  }, [gameState])
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [phase])
 
   async function submitScore() {
     if (!submitName.trim() || !submitTime) return
@@ -387,179 +464,133 @@ export default function GamePage() {
         time: submitTime,
         date: serverTimestamp(),
       })
-      setSubmitted(true)
-      setShowSubmit(false)
-      fetchLeaderboard()
-    } catch (e) { console.error(e) }
+      setSaved(true)
+      fetchLB()
+    } catch {}
     setSubmitting(false)
   }
 
   // Touch controls
-  const touchRef = useRef({})
-  function touchBtn(key, down) {
-    stateRef.current.keys[key] = down
-  }
+  function tb(key, down) { gsRef.current.keys[key] = down }
 
   return (
     <div style={{ minHeight: '100vh', background: '#050505', paddingBottom: '80px' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 20px 0' }}>
+      <div style={{ maxWidth: '1060px', margin: '0 auto', padding: '28px 20px 0' }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-          <Link to="/" style={{ color: 'var(--muted)', fontSize: '13px', fontFamily: 'var(--font-mono)', letterSpacing: '1px' }}>← BACK</Link>
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '28px', fontWeight: 900, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text)', margin: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+          <Link to="/" style={{ color: 'var(--muted)', fontSize: '12px', fontFamily: 'var(--font-mono)', letterSpacing: '1px' }}>← BACK</Link>
+          <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '26px', fontWeight: 900, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text)', margin: 0 }}>
             RACE <span style={{ color: 'var(--primary)' }}>GAME</span>
           </h1>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', letterSpacing: '1px' }}>W/↑ throttle · S/↓ brake · A/D or ←/→ steer · {TOTAL_LAPS} laps</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
 
-          {/* Game area */}
-          <div style={{ flex: '1 1 600px' }}>
-            <div style={{ position: 'relative', border: '1px solid rgba(57,255,20,0.2)', borderRadius: '4px', overflow: 'hidden', background: '#0a1a08' }}>
-              <canvas ref={canvasRef} width={W} height={H} style={{ display: 'block', width: '100%', maxWidth: W + 'px' }} />
+          {/* Canvas */}
+          <div style={{ flex: '1 1 580px', position: 'relative' }}>
+            <div style={{ position: 'relative', border: '1px solid rgba(57,255,20,0.2)', borderRadius: '4px', overflow: 'hidden' }}>
+              <canvas ref={canvasRef} width={CW} height={CH} style={{ display: 'block', width: '100%', background: '#0d1a0a' }} />
 
-              {/* HUD overlay */}
-              {gameState === 'racing' && (
-                <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
-                  <div style={hudBox}>
-                    <span style={hudLabel}>LAP</span>
-                    <span style={hudVal}>{display.lap === 0 ? '--' : `${display.lap} / 3`}</span>
-                  </div>
-                  <div style={hudBox}>
-                    <span style={hudLabel}>LAST</span>
-                    <span style={hudVal}>{formatTime(display.lastLap)}</span>
-                  </div>
-                  <div style={hudBox}>
-                    <span style={hudLabel}>BEST</span>
-                    <span style={{ ...hudVal, color: 'var(--primary)' }}>{formatTime(display.bestLap)}</span>
-                  </div>
-                  <div style={hudBox}>
-                    <span style={hudLabel}>KM/H</span>
-                    <span style={hudVal}>{Math.round(display.speed * 62)}</span>
-                  </div>
+              {/* Racing HUD */}
+              {phase === 'racing' && (
+                <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div style={hb}><span style={hl}>LAP</span><span style={hv}>{hud.lap === 0 ? '--' : `${hud.lap} / ${TOTAL_LAPS}`}</span></div>
+                  <div style={hb}><span style={hl}>TIME</span><span style={hv}>{formatTime(hud.elapsed)}</span></div>
+                  <div style={hb}><span style={hl}>LAST</span><span style={hv}>{formatTime(hud.lastLap)}</span></div>
+                  <div style={hb}><span style={hl}>BEST</span><span style={{ ...hv, color: 'var(--primary)' }}>{formatTime(hud.bestLap)}</span></div>
+                  <div style={{ ...hb, minWidth: '70px' }}><span style={hl}>KM/H</span><span style={hv}>{hud.spd}</span></div>
                 </div>
               )}
 
-              {/* Idle overlay */}
-              {gameState === 'idle' && (
-                <div style={overlay}>
-                  <p style={{ fontFamily: 'var(--font-heading)', fontSize: '40px', fontWeight: 900, letterSpacing: '4px', color: 'var(--primary)', textShadow: '0 0 30px rgba(57,255,20,0.6)', margin: 0 }}>RAPIDLY RL RACING</p>
-                  <p style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '13px', marginTop: '8px' }}>Complete 3 laps · Best lap goes to leaderboard</p>
-                  <p style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', marginTop: '4px' }}>W / ↑ Throttle · S / ↓ Brake · A/D or ← → Steer</p>
-                  <button onClick={startGame} style={startBtn}>START RACE</button>
+              {/* Idle */}
+              {phase === 'idle' && (
+                <div style={overlayStyle}>
+                  <div style={{ fontFamily: 'var(--font-heading)', fontSize: '42px', fontWeight: 900, letterSpacing: '4px', color: 'var(--primary)', textShadow: '0 0 40px rgba(57,255,20,0.6)', textTransform: 'uppercase' }}>RAPIDLY RL</div>
+                  <div style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700, letterSpacing: '3px', color: 'var(--text)', textTransform: 'uppercase', marginTop: '4px' }}>Racing Game</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginTop: '12px', textAlign: 'center', lineHeight: 1.8 }}>
+                    Complete {TOTAL_LAPS} laps · Best lap time goes to the leaderboard<br/>
+                    W/↑ Throttle &nbsp;·&nbsp; S/↓ Brake &nbsp;·&nbsp; A/D or ←/→ Steer
+                  </div>
+                  <button onClick={startRace} style={bigBtn}>START RACE</button>
                 </div>
               )}
 
-              {/* Finished overlay */}
-              {gameState === 'finished' && (
-                <div style={overlay}>
-                  <p style={{ fontFamily: 'var(--font-heading)', fontSize: '36px', fontWeight: 900, letterSpacing: '3px', color: 'var(--primary)', margin: 0 }}>RACE COMPLETE</p>
-                  <p style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '16px', marginTop: '12px' }}>Best lap: <span style={{ color: 'var(--primary)' }}>{formatTime(submitTime)}</span></p>
-                  {showSubmit && !submitted && (
-                    <div style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input
-                        value={submitName}
-                        onChange={e => setSubmitName(e.target.value)}
+              {/* Done */}
+              {phase === 'done' && (
+                <div style={overlayStyle}>
+                  <div style={{ fontFamily: 'var(--font-heading)', fontSize: '38px', fontWeight: 900, letterSpacing: '3px', color: 'var(--primary)', textTransform: 'uppercase' }}>RACE COMPLETE</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', color: 'var(--text)', marginTop: '12px' }}>
+                    Best lap: <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{formatTime(submitTime)}</span>
+                  </div>
+                  {!saved ? (
+                    <div style={{ marginTop: '18px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <input value={submitName} onChange={e => setSubmitName(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && submitScore()}
-                        placeholder="Your name"
+                        placeholder="Enter your name"
                         maxLength={24}
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(57,255,20,0.4)', color: '#fff', padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '13px', borderRadius: '2px', outline: 'none', width: '160px' }}
+                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(57,255,20,0.4)', color: '#fff', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '13px', borderRadius: '2px', outline: 'none', width: '180px' }}
                       />
-                      <button onClick={submitScore} disabled={submitting || !submitName.trim()} style={{ ...startBtn, marginTop: 0, padding: '8px 18px', fontSize: '13px' }}>
+                      <button onClick={submitScore} disabled={submitting || !submitName.trim()} style={{ ...bigBtn, marginTop: 0, padding: '9px 20px', fontSize: '13px', opacity: submitName.trim() ? 1 : 0.4 }}>
                         {submitting ? '...' : 'SUBMIT'}
                       </button>
                     </div>
+                  ) : (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--primary)', marginTop: '14px' }}>Score saved to leaderboard!</div>
                   )}
-                  {submitted && <p style={{ color: 'var(--primary)', fontFamily: 'var(--font-mono)', fontSize: '13px', marginTop: '12px' }}>Score saved!</p>}
-                  <button onClick={startGame} style={{ ...startBtn, marginTop: '14px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)', fontSize: '12px', padding: '7px 16px' }}>
-                    RACE AGAIN
-                  </button>
+                  <button onClick={startRace} style={{ ...bigBtn, marginTop: '14px', background: 'transparent', color: 'var(--muted)', border: '1px solid rgba(255,255,255,0.12)', fontSize: '12px', padding: '8px 20px', boxShadow: 'none' }}>RACE AGAIN</button>
                 </div>
               )}
             </div>
 
             {/* Touch controls */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', gap: '8px' }} className="touch-controls">
+            <div className="game-touch" style={{ display: 'none', justifyContent: 'space-between', marginTop: '10px', gap: '8px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onPointerDown={() => touchBtn('a', true)} onPointerUp={() => touchBtn('a', false)} onPointerLeave={() => touchBtn('a', false)} style={touchBtnStyle}>◀</button>
-                <button onPointerDown={() => touchBtn('d', true)} onPointerUp={() => touchBtn('d', false)} onPointerLeave={() => touchBtn('d', false)} style={touchBtnStyle}>▶</button>
+                <button onPointerDown={() => tb('a',true)} onPointerUp={() => tb('a',false)} onPointerLeave={() => tb('a',false)} style={tBtn}>◀</button>
+                <button onPointerDown={() => tb('d',true)} onPointerUp={() => tb('d',false)} onPointerLeave={() => tb('d',false)} style={tBtn}>▶</button>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onPointerDown={() => touchBtn('s', true)} onPointerUp={() => touchBtn('s', false)} onPointerLeave={() => touchBtn('s', false)} style={{ ...touchBtnStyle, color: '#f44' }}>BRAKE</button>
-                <button onPointerDown={() => touchBtn('w', true)} onPointerUp={() => touchBtn('w', false)} onPointerLeave={() => touchBtn('w', false)} style={{ ...touchBtnStyle, color: 'var(--primary)', borderColor: 'rgba(57,255,20,0.4)' }}>GAS</button>
+                <button onPointerDown={() => tb('s',true)} onPointerUp={() => tb('s',false)} onPointerLeave={() => tb('s',false)} style={{ ...tBtn, color: '#f55' }}>BRAKE</button>
+                <button onPointerDown={() => tb('w',true)} onPointerUp={() => tb('w',false)} onPointerLeave={() => tb('w',false)} style={{ ...tBtn, color: 'var(--primary)', borderColor: 'rgba(57,255,20,0.4)' }}>GAS</button>
               </div>
             </div>
           </div>
 
           {/* Leaderboard */}
-          <div style={{ flex: '1 1 220px', minWidth: '200px' }}>
+          <div style={{ flex: '0 0 200px', minWidth: '180px' }}>
             <div style={{ border: '1px solid rgba(57,255,20,0.15)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ background: 'rgba(57,255,20,0.08)', padding: '12px 16px', borderBottom: '1px solid rgba(57,255,20,0.12)' }}>
-                <p style={{ fontFamily: 'var(--font-heading)', fontSize: '16px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--primary)', margin: 0 }}>Leaderboard</p>
+              <div style={{ background: 'rgba(57,255,20,0.07)', padding: '10px 14px', borderBottom: '1px solid rgba(57,255,20,0.1)' }}>
+                <p style={{ fontFamily: 'var(--font-heading)', fontSize: '15px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--primary)', margin: 0 }}>Leaderboard</p>
                 <p style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', marginTop: '2px' }}>Best lap times</p>
               </div>
-              <div style={{ padding: '8px 0' }}>
+              <div>
                 {leaderboard.length === 0 && (
-                  <p style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', padding: '16px', textAlign: 'center' }}>No times yet. Be first!</p>
+                  <p style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '16px', textAlign: 'center' }}>No times yet.<br/>Be first!</p>
                 )}
-                {leaderboard.map((entry, i) => (
-                  <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--muted)', width: '16px', flexShrink: 0 }}>
-                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                {leaderboard.map((e, i) => (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: i===0?'#FFD700':i===1?'#C0C0C0':i===2?'#CD7F32':'var(--muted)', width: '18px', flexShrink: 0, textAlign: 'center' }}>
+                      {i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}
                     </span>
-                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: i === 0 ? 'var(--primary)' : 'var(--muted)', flexShrink: 0 }}>{formatTime(entry.time)}</span>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: i===0?'var(--primary)':'var(--muted)', flexShrink: 0 }}>{formatTime(e.time)}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-
         </div>
       </div>
 
-      <style>{`
-        .touch-controls { display: none; }
-        @media (max-width: 768px) { .touch-controls { display: flex !important; } }
-      `}</style>
+      <style>{`@media(max-width:768px){.game-touch{display:flex!important}}`}</style>
     </div>
   )
 }
 
-const hudBox = {
-  background: 'rgba(0,0,0,0.7)',
-  border: '1px solid rgba(57,255,20,0.2)',
-  borderRadius: '2px',
-  padding: '4px 10px',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'flex-end',
-  minWidth: '80px',
-}
-const hudLabel = { fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', letterSpacing: '1px' }
-const hudVal = { fontFamily: 'var(--font-mono)', fontSize: '14px', color: '#fff', fontWeight: 700 }
-const overlay = {
-  position: 'absolute', inset: 0,
-  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)',
-}
-const startBtn = {
-  marginTop: '22px',
-  background: 'var(--primary)', color: '#050505',
-  fontFamily: 'var(--font-heading)', fontSize: '16px', fontWeight: 800, letterSpacing: '2px',
-  padding: '12px 32px', border: 'none', cursor: 'pointer', borderRadius: '2px',
-  textTransform: 'uppercase',
-  boxShadow: '0 0 24px rgba(57,255,20,0.4)',
-}
-const touchBtnStyle = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid var(--border)',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: '14px',
-  padding: '12px 20px',
-  borderRadius: '2px',
-  cursor: 'pointer',
-  userSelect: 'none',
-  WebkitUserSelect: 'none',
-}
+// ─── style constants ──────────────────────────────────────────────────────────
+const hb = { background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(57,255,20,0.18)', borderRadius: '2px', padding: '3px 8px', display: 'flex', flexDirection: 'column', minWidth: '76px' }
+const hl = { fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--muted)', letterSpacing: '1.5px' }
+const hv = { fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#fff', fontWeight: 700 }
+const overlayStyle = { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)' }
+const bigBtn = { marginTop: '24px', background: 'var(--primary)', color: '#050505', fontFamily: 'var(--font-heading)', fontSize: '17px', fontWeight: 800, letterSpacing: '2px', padding: '13px 36px', border: 'none', cursor: 'pointer', borderRadius: '2px', textTransform: 'uppercase', boxShadow: '0 0 28px rgba(57,255,20,0.45)' }
+const tBtn = { background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '14px', padding: '12px 22px', borderRadius: '2px', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }
