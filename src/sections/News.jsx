@@ -18,20 +18,12 @@ function NewsCard({ item, index }) {
       viewport={{ once: true }}
       transition={{ delay: index * 0.08, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ y: -6 }}
+      className="glow-card"
       style={{
         background: 'var(--card)',
-        border: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', transition: 'border-color 0.3s, box-shadow 0.3s', cursor: 'default',
+        cursor: 'default',
         position: 'relative',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(57,255,20,0.3)'
-        e.currentTarget.style.boxShadow = '0 12px 40px rgba(57,255,20,0.08)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = 'var(--border)'
-        e.currentTarget.style.boxShadow = 'none'
       }}
     >
       {/* Top accent line in category color */}

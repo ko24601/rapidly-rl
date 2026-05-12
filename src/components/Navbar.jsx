@@ -16,6 +16,25 @@ function scrollTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function btnStyle(v) {
+  const base = {
+    fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 700,
+    letterSpacing: '1px', padding: '9px 18px', borderRadius: '2px', cursor: 'pointer',
+    transition: 'all 0.25s', whiteSpace: 'nowrap', textDecoration: 'none',
+    textTransform: 'uppercase',
+  }
+  if (v === 'primary') return {
+    ...base, background: 'var(--primary)', color: '#050505',
+    border: '1px solid var(--primary)', boxShadow: '0 0 20px rgba(57,255,20,0.35)',
+  }
+  if (v === 'discord') return {
+    ...base, background: 'var(--primary)', color: '#050505',
+    border: '1px solid var(--primary)',
+    boxShadow: '0 0 24px rgba(57,255,20,0.45), 0 0 48px rgba(57,255,20,0.15)',
+  }
+  return { ...base, background: 'transparent', color: 'var(--text)', border: '1px solid var(--border)' }
+}
+
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -44,6 +63,10 @@ export default function Navbar() {
     }
   }
 
+  const isHome = location.pathname === '/'
+  const isDrivers = location.pathname === '/drivers'
+  const isGame = location.pathname === '/game'
+
   return (
     <>
       <nav style={{
@@ -53,7 +76,7 @@ export default function Navbar() {
         background: scrolled ? 'rgba(4,4,4,0.98)' : 'rgba(5,5,5,0.88)',
         backdropFilter: 'blur(16px)',
         borderBottom: scrolled ? '1px solid rgba(57,255,20,0.2)' : '1px solid var(--border)',
-        boxShadow: scrolled ? '0 4px 32px rgba(57,255,20,0.06)' : 'none',
+        boxShadow: scrolled ? '0 4px 32px rgba(57,255,20,0.08)' : 'none',
         height: '64px',
         display: 'flex',
         alignItems: 'center',
@@ -67,8 +90,8 @@ export default function Navbar() {
           <div style={{
             position: 'absolute', bottom: 0, left: 0, right: 0, height: '1px',
             background: 'linear-gradient(to right, transparent, var(--primary), transparent)',
-            boxShadow: '0 0 12px var(--primary)',
-            opacity: 0.6,
+            boxShadow: '0 0 18px var(--primary)',
+            opacity: 0.7,
           }} />
         )}
 
@@ -78,33 +101,56 @@ export default function Navbar() {
           <span style={{
             fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700,
             letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text)',
+            animation: 'neonFlicker 12s infinite 6s',
           }}>{SITE.name}</span>
         </Link>
 
         {/* Desktop Nav Links */}
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1 }} className="desktop-nav">
-          {NAV_LINKS.map((link) => (
-            <button key={link.section} onClick={() => handleNavClick(link.section)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500, letterSpacing: '0.5px', padding: '8px 12px', cursor: 'pointer', transition: 'color 0.2s', whiteSpace: 'nowrap' }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
-            >{link.label}</button>
-          ))}
+          {NAV_LINKS.map((link) => {
+            const active = isHome
+            return (
+              <button key={link.section} onClick={() => handleNavClick(link.section)}
+                style={{
+                  background: 'none', border: 'none',
+                  color: 'var(--muted)',
+                  fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500,
+                  letterSpacing: '0.5px', padding: '8px 12px', cursor: 'pointer',
+                  transition: 'color 0.2s', whiteSpace: 'nowrap',
+                  position: 'relative',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+              >{link.label}</button>
+            )
+          })}
           <Link to="/drivers"
-            style={{ color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500, letterSpacing: '0.5px', padding: '8px 12px', transition: 'color 0.2s', whiteSpace: 'nowrap', textDecoration: 'none' }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+            style={{
+              color: isDrivers ? 'var(--primary)' : 'var(--muted)',
+              fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500,
+              letterSpacing: '0.5px', padding: '8px 12px', transition: 'color 0.2s',
+              whiteSpace: 'nowrap', textDecoration: 'none', position: 'relative',
+              borderBottom: isDrivers ? '2px solid var(--primary)' : '2px solid transparent',
+            }}
+            onMouseEnter={e => { if (!isDrivers) e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { if (!isDrivers) e.currentTarget.style.color = 'var(--muted)' }}
           >Drivers</Link>
           <Link to="/game"
-            style={{ color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500, letterSpacing: '0.5px', padding: '8px 12px', transition: 'color 0.2s', whiteSpace: 'nowrap', textDecoration: 'none' }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+            style={{
+              color: isGame ? 'var(--primary)' : 'var(--muted)',
+              fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 500,
+              letterSpacing: '0.5px', padding: '8px 12px', transition: 'color 0.2s',
+              whiteSpace: 'nowrap', textDecoration: 'none', position: 'relative',
+              borderBottom: isGame ? '2px solid var(--primary)' : '2px solid transparent',
+            }}
+            onMouseEnter={e => { if (!isGame) e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { if (!isGame) e.currentTarget.style.color = 'var(--muted)' }}
           >Game</Link>
         </div>
 
         {/* Desktop Actions */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }} className="desktop-actions">
-          <a href={SITE.discord} target="_blank" rel="noopener noreferrer" style={btnStyle('ghost')}>Join Discord</a>
+          <a href={SITE.discord} target="_blank" rel="noopener noreferrer" style={btnStyle('discord')}>Join Discord</a>
           <Link to="/sponsors" style={btnStyle('ghost')}>Become a Sponsor</Link>
           <Link to="/admin" style={btnStyle('primary')}>Admin</Link>
         </div>
@@ -144,16 +190,16 @@ export default function Navbar() {
                 </button>
               ))}
               <Link to="/drivers" onClick={() => setOpen(false)}
-                style={{ color: 'var(--text)', fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', textAlign: 'left', padding: '10px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none', display: 'block' }}>
+                style={{ color: isDrivers ? 'var(--primary)' : 'var(--text)', fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', textAlign: 'left', padding: '10px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none', display: 'block' }}>
                 Drivers
               </Link>
               <Link to="/game" onClick={() => setOpen(false)}
-                style={{ color: 'var(--text)', fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', textAlign: 'left', padding: '10px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none', display: 'block' }}>
+                style={{ color: isGame ? 'var(--primary)' : 'var(--text)', fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', textAlign: 'left', padding: '10px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none', display: 'block' }}>
                 Game
               </Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '24px' }}>
-              <a href={SITE.discord} target="_blank" rel="noopener noreferrer" style={{ ...btnStyle('primary'), justifyContent: 'center', display: 'flex' }}>Join Discord</a>
+              <a href={SITE.discord} target="_blank" rel="noopener noreferrer" style={{ ...btnStyle('discord'), justifyContent: 'center', display: 'flex' }}>Join Discord</a>
               <Link to="/sponsors" onClick={() => setOpen(false)} style={{ ...btnStyle('ghost'), justifyContent: 'center', display: 'flex' }}>Become a Sponsor</Link>
               <Link to="/admin" onClick={() => setOpen(false)} style={{ ...btnStyle('ghost'), justifyContent: 'center', display: 'flex' }}>Admin</Link>
             </div>
@@ -170,10 +216,4 @@ export default function Navbar() {
       `}</style>
     </>
   )
-}
-
-function btnStyle(v) {
-  const base = { fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 600, letterSpacing: '0.5px', padding: '8px 16px', borderRadius: '2px', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', textDecoration: 'none' }
-  if (v === 'primary') return { ...base, background: 'var(--primary)', color: '#050505', border: '1px solid var(--primary)' }
-  return { ...base, background: 'transparent', color: 'var(--text)', border: '1px solid var(--border)' }
 }

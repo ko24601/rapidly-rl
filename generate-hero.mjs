@@ -27,19 +27,19 @@ glow2.addColorStop(1, 'rgba(0,0,0,0)')
 ctx.fillStyle = glow2
 ctx.fillRect(0, 0, W, H)
 
-// Speed lines — diagonal light streaks across the bg
+// Speed lines — diagonal light streaks, fixed angle so none go horizontal
 ctx.save()
 ctx.globalAlpha = 0.04
 for (let i = 0; i < 30; i++) {
-  const x = Math.random() * W * 1.5 - W * 0.25
-  const y = Math.random() * H
-  const len = 200 + Math.random() * 600
-  const thick = 0.5 + Math.random() * 1.5
+  const x = (i / 30) * W * 1.5 - W * 0.25
+  const y = (i * 137.5) % H
+  const len = 200 + (i * 73) % 600
+  const thick = 0.5 + (i % 3) * 0.5
   ctx.strokeStyle = '#39FF14'
   ctx.lineWidth = thick
   ctx.beginPath()
   ctx.moveTo(x, y)
-  ctx.lineTo(x + len * 1.8, y - len * 0.3)
+  ctx.lineTo(x + len * 1.8, y - len * 0.55)
   ctx.stroke()
 }
 ctx.restore()

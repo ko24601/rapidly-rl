@@ -8,20 +8,13 @@ function StaffCard({ member, index }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ delay: index * 0.08, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ y: -6 }}
+      whileHover={{ y: -6, scale: 1.02 }}
+      className="glow-card"
       style={{
-        background: 'var(--card)', border: '1px solid var(--border)',
+        background: 'var(--card)',
         padding: '32px 20px 24px', textAlign: 'center',
-        transition: 'border-color 0.3s, box-shadow 0.3s', cursor: 'default',
-        position: 'relative', overflow: 'hidden',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(57,255,20,0.3)'
-        e.currentTarget.style.boxShadow = '0 0 30px rgba(57,255,20,0.08)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = 'var(--border)'
-        e.currentTarget.style.boxShadow = 'none'
+        cursor: 'default',
+        position: 'relative',
       }}
     >
       {/* Corner accent */}

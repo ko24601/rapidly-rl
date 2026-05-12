@@ -1,33 +1,42 @@
 :root {
   --primary: #39FF14;
   --primary-glow: rgba(57,255,20,0.55);
+  --primary-dim: rgba(57,255,20,0.15);
   --bg: #050505;
+  --bg2: #070709;
   --card: rgba(10,10,10,0.95);
   --surface: #080808;
   --text: #e8e8e8;
   --muted: #555;
   --border: rgba(255,255,255,0.07);
+  --border-glow: rgba(57,255,20,0.25);
   --font-heading: 'Barlow Condensed', sans-serif;
   --font-body: 'Barlow', sans-serif;
   --font-mono: 'Roboto Mono', monospace;
 }
 
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
 body {
-  background: var(--bg);
+  background: radial-gradient(ellipse at 20% 50%, rgba(57,255,20,0.025) 0%, #050505 50%) fixed;
+  background-color: #050505;
   color: var(--text);
   font-family: var(--font-body);
   overflow-x: hidden;
 }
 
+/* Selection */
+::selection { background: rgba(57,255,20,0.25); color: #fff; }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: #0a0a0a; }
-::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 2px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, var(--primary), rgba(57,255,20,0.4));
+  border-radius: 3px;
+  box-shadow: 0 0 6px rgba(57,255,20,0.5);
+}
 
 a, button, input, textarea, select, [role="button"] { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
@@ -59,9 +68,10 @@ input, textarea, select { font-family: var(--font-body); }
   background: linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent);
   animation: shimmer 2.5s ease-in-out infinite;
 }
+
+/* ── Keyframes ─────────────────────────────────────────────── */
 @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(400%)} }
 
-/* Glitch layers */
 @keyframes glitch1 {
   0%,89%,100%{clip-path:inset(0 0 100% 0);transform:translate(0)}
   90%{clip-path:inset(20% 0 40% 0);transform:translate(-4px,1px)}
@@ -84,4 +94,115 @@ input, textarea, select { font-family: var(--font-body); }
 @keyframes heroPulse { 0%,100%{opacity:0.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.1)} }
 @keyframes neonFlicker {
   0%,95%,100%{opacity:1} 96%{opacity:0.7} 98%{opacity:0.9} 99%{opacity:0.6}
+}
+@keyframes revealDown { from { transform: scaleY(1) } to { transform: scaleY(0) } }
+@keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+@keyframes pulse-glow {
+  0%,100% { box-shadow: 0 0 8px rgba(57,255,20,0.4) }
+  50% { box-shadow: 0 0 24px rgba(57,255,20,0.8), 0 0 48px rgba(57,255,20,0.3) }
+}
+@keyframes border-spin { to { transform: rotate(360deg) } }
+@keyframes scan-line {
+  0% { transform: translateY(-100%) }
+  100% { transform: translateY(400%) }
+}
+@keyframes text-glow {
+  0%,100% { text-shadow: 0 0 10px rgba(57,255,20,0.4) }
+  50% { text-shadow: 0 0 20px rgba(57,255,20,0.8), 0 0 40px rgba(57,255,20,0.4) }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px) }
+  to { opacity: 1; transform: translateY(0) }
+}
+@keyframes border-glow-pulse {
+  0%,100% { border-color: rgba(57,255,20,0.2) }
+  50% { border-color: rgba(57,255,20,0.6) }
+}
+
+/* ── Utility classes ───────────────────────────────────────── */
+
+/* Glowing neon text */
+.neon {
+  color: var(--primary);
+  text-shadow: 0 0 10px rgba(57,255,20,0.6), 0 0 30px rgba(57,255,20,0.3);
+}
+.neon-pulse {
+  color: var(--primary);
+  animation: text-glow 3s ease-in-out infinite;
+}
+
+/* Glow card */
+.glow-card {
+  position: relative;
+  border: 1px solid var(--border);
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+  overflow: hidden;
+}
+.glow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(57,255,20,0.06) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+.glow-card:hover {
+  border-color: rgba(57,255,20,0.3);
+  box-shadow: 0 8px 40px rgba(57,255,20,0.08), 0 0 0 1px rgba(57,255,20,0.05);
+  transform: translateY(-3px);
+}
+.glow-card:hover::before { transform: translateX(100%); }
+
+/* Neon button */
+.btn-neon {
+  position: relative; overflow: hidden;
+  background: transparent;
+  border: 1px solid rgba(57,255,20,0.4);
+  color: var(--primary);
+  font-family: var(--font-body); font-weight: 700; letter-spacing: 1.5px;
+  padding: 10px 24px; cursor: pointer;
+  transition: all 0.25s;
+  text-transform: uppercase;
+}
+.btn-neon::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--primary); transform: scaleX(0); transform-origin: left;
+  transition: transform 0.25s ease; z-index: -1;
+}
+.btn-neon:hover {
+  color: #050505;
+  border-color: var(--primary);
+  box-shadow: 0 0 20px rgba(57,255,20,0.4);
+}
+.btn-neon:hover::before { transform: scaleX(1); }
+
+/* Animated border */
+.pulse-border { animation: border-glow-pulse 2s ease-in-out infinite; }
+
+/* Section reveal animation */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* Grid background pattern */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(57,255,20,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57,255,20,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Glowing horizontal rule */
+.glow-hr {
+  border: none; height: 1px;
+  background: linear-gradient(to right, transparent, var(--primary), transparent);
+  box-shadow: 0 0 8px rgba(57,255,20,0.4);
+}
+
+/* Number badge for sections */
+.section-num {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 4px; color: rgba(57,255,20,0.5);
+  margin-bottom: 10px; display: block;
 }

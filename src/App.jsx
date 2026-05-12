@@ -3,6 +3,8 @@ import { Routes, Route } from 'react-router-dom'
 import { SITE } from './config.js'
 import { DatabaseProvider } from './context/DatabaseContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import CustomCursor from './components/CustomCursor.jsx'
+import PageReveal from './components/PageReveal.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
 import Navbar from './components/Navbar.jsx'
 import MobileNav from './components/MobileNav.jsx'
@@ -44,21 +46,25 @@ export default function App() {
   }, [])
 
   return (
-    <DatabaseProvider>
-      <ToastProvider>
-        <AnnouncementBanner />
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/drivers" element={<DriversPage />} />
-          <Route path="/compare" element={<DriverComparison />} />
-          <Route path="/sponsors" element={<Sponsors />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/game" element={<GamePage />} />
-        </Routes>
-        <Footer />
-        <MobileNav />
-      </ToastProvider>
-    </DatabaseProvider>
+    <>
+      <CustomCursor />
+      <PageReveal />
+      <DatabaseProvider>
+        <ToastProvider>
+          <AnnouncementBanner />
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/drivers" element={<DriversPage />} />
+            <Route path="/compare" element={<DriverComparison />} />
+            <Route path="/sponsors" element={<Sponsors />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/game" element={<GamePage />} />
+          </Routes>
+          <Footer />
+          <MobileNav />
+        </ToastProvider>
+      </DatabaseProvider>
+    </>
   )
 }
