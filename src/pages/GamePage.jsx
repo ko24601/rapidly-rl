@@ -1,22 +1,24 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { db } from '../firebase.js'
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, where } from 'firebase/firestore'
 
 // ─── canvas size ──────────────────────────────────────────────────────────────
-const CW = 900, CH = 540
+const CW = 1000, CH = 620
 
 // ─── physics ──────────────────────────────────────────────────────────────────
 const TRACK_HALF = 46
-const MAX_SPD = 9
-const ACCEL = 0.20
+const MAX_SPD = 10
+const ACCEL = 0.22
 const BRAKE_F = 0.30
 const FRICTION = 0.970
-const LAT_GRIP = 0.80
+const LAT_GRIP = 0.82
 const STEER_RATE = 0.052
 const TOTAL_LAPS = 3
 
 // ─── tracks ───────────────────────────────────────────────────────────────────
+// Monaco: tight street circuit, L-shaped, famous for Loews hairpin, tunnel, swimming pool chicane
+// Based on actual Circuit de Monaco layout proportions from SVG path data
 const TRACKS = {
   monaco: {
     name: 'Monaco',
@@ -24,18 +26,32 @@ const TRACKS = {
     subtitle: 'Circuit de Monaco',
     accentColor: '#e91e63',
     points: [
-      [900,760],[780,760],[650,760],[530,760],
-      [420,745],[330,690],[280,610],
-      [270,530],[285,455],[330,395],
-      [400,350],[490,325],[590,320],[680,325],
-      [750,360],[785,430],[780,510],
-      [755,580],[700,615],[645,600],
-      [615,545],[610,480],[635,415],[680,375],
-      [740,330],[810,305],[890,300],[970,310],
-      [1040,340],[1100,395],[1130,460],
-      [1110,520],[1065,545],[1030,530],[1050,580],[1090,595],
-      [1130,640],[1110,700],[1050,740],
-      [990,760],[940,760],[900,760],
+      // Start/finish straight (horizontal, bottom-left area)
+      [700,700],[610,700],[510,700],[420,698],
+      // Sainte Devote - tight right-hander
+      [345,685],[300,650],[292,615],
+      // Uphill to Beau Rivage - climbing left
+      [298,570],[310,520],[330,475],[360,430],[395,395],
+      // Massenet - sweeping right at Casino Square
+      [440,365],[490,345],[545,335],[600,332],
+      // Casino Square / Mirabeau area
+      [660,340],[710,355],[745,380],
+      // Loews hairpin - the tightest corner in F1, sharp U-turn
+      [768,415],[775,450],[768,488],[745,515],[710,530],[675,530],[645,515],
+      // Portier - heading toward the tunnel
+      [620,495],[600,468],[590,435],[592,400],
+      // Tunnel - long straight going right (under the hill)
+      [600,370],[640,340],[700,315],[775,295],[860,285],[950,283],[1040,285],[1110,292],
+      // Nouvelle Chicane (exit tunnel) - right then left
+      [1160,305],[1190,330],[1185,365],[1160,390],[1125,400],
+      // Tabac - right-hander
+      [1085,408],[1050,420],[1030,445],
+      // Swimming pool chicane - quick S-curves
+      [1020,475],[1030,505],[1060,520],[1090,520],[1115,505],[1120,478],[1105,455],
+      // Rascasse - tight right-hander
+      [1080,438],[1050,430],[1015,440],[990,465],[980,500],[985,535],[1000,560],
+      // Anthony Noghes - final corner back to pit straight
+      [1010,590],[1000,625],[975,655],[940,672],[890,685],[820,695],[760,700],[700,700],
     ],
   },
   silverstone: {
@@ -43,15 +59,41 @@ const TRACKS = {
     flag: '🇬🇧',
     subtitle: 'British Grand Prix',
     accentColor: '#2196f3',
+    // Silverstone GP: flowing high-speed circuit, roughly rectangular with rounded corners
+    // Famous Maggots/Becketts/Chapel S-curves, long Hangar straight, fast Copse, Stowe
     points: [
-      [950,730],[800,730],[650,730],[500,730],
-      [370,710],[270,645],[240,550],
-      [255,455],[310,375],[390,325],
-      [480,310],[560,330],[610,295],[660,250],
-      [750,230],[860,225],[980,235],[1080,255],
-      [1170,310],[1220,400],[1210,490],
-      [1175,570],[1130,635],[1085,690],
-      [1030,730],[990,740],[950,730],
+      // Start/finish straight (Wellington straight) - top of circuit running right
+      [400,220],[500,215],[600,212],[700,212],[800,215],[900,220],[980,228],
+      // Copse - fast right-hander (no braking required in modern F1)
+      [1040,245],[1085,275],[1100,315],[1095,355],
+      // Maggots - sweeping left
+      [1075,390],[1040,415],[995,428],
+      // Becketts - sharp right
+      [955,425],[920,408],[898,382],[898,350],
+      // Chapel - left
+      [900,318],[920,292],[950,276],[985,268],
+      // Hangar straight - long straight running down-right
+      [1025,268],[1080,272],[1140,282],[1200,298],[1255,322],
+      // Stowe - right-hander
+      [1290,360],[1305,405],[1300,450],[1278,490],[1243,520],
+      // Vale - left
+      [1195,545],[1145,555],[1095,550],
+      // Club corner - right-hander
+      [1050,545],[1015,530],[990,505],[975,475],[972,442],
+      // Abbey - right
+      [978,408],[998,382],[1025,365],
+      // Farm curve - left
+      [1050,352],[1070,340],
+      // Village / The Loop (Arena complex)
+      [1075,325],
+      // Loop right
+      [1060,300],
+      // Aintree - left
+      [1030,285],[998,278],
+      // Woodcote - sweeping right returning to pit straight
+      [800,240],[700,225],[600,218],[500,216],[400,220],
+      // Close the loop - but we need the proper path from Club back
+      // Re-approach from Club through National Pits hairpin back to Wellington straight
     ],
   },
   suzuka: {
@@ -59,21 +101,209 @@ const TRACKS = {
     flag: '🇯🇵',
     subtitle: 'Japanese Grand Prix',
     accentColor: '#ff9800',
-    points: [
-      [980,760],[840,760],[700,760],[560,760],
-      [430,740],[330,670],[280,570],[280,460],
-      [300,370],[360,300],[440,270],
-      [510,265],[560,220],[510,180],[440,175],
-      [360,195],[290,250],[260,340],
-      [270,430],[310,500],[380,530],
-      [450,545],[490,500],[480,435],
-      [450,370],[460,305],[520,270],
-      [600,275],[680,310],[750,370],
-      [820,420],[880,500],[910,590],
-      [900,670],[865,730],[900,760],[980,760],
-    ],
+    // Suzuka: unique figure-8, S-curves, Degner, hairpin, Spoon, 130R, chicane
+    points: [],
   },
 }
+
+// Silverstone - cleaner redesign with proper GP layout
+TRACKS.silverstone.points = [
+  // Start/finish straight (pit straight) - left to right
+  [280,380],[380,375],[480,372],[580,370],[680,370],[760,372],
+  // Copse corner - fast sweeping right
+  [840,380],[895,405],[918,445],[910,488],
+  // Maggots - left sweep
+  [885,520],[848,543],[805,548],[765,538],
+  // Becketts - sharp right, then left (S-curves, most dramatic in F1)
+  [730,520],[710,493],[712,462],[730,438],[758,422],
+  // Chapel - tightening right
+  [790,412],[820,408],[848,415],
+  // Hangar straight - long, heading right and slightly down
+  [882,428],[940,445],[1010,465],[1085,488],[1140,510],[1185,535],
+  // Stowe - sweeping right-hander
+  [1220,572],[1238,618],[1230,662],[1200,695],[1155,715],[1105,720],
+  // Vale - left
+  [1048,715],[1000,700],[965,675],[950,642],
+  // Club - right-hander
+  [948,605],[965,575],[995,555],[1030,548],[1062,555],
+  // Return loop (Abbey, Farm, Village, Loop complex)
+  [1088,572],[1100,600],[1090,638],[1062,668],[1022,685],
+  [970,692],[915,688],[870,672],[840,645],[830,610],
+  // Woodcote sweep - long right-hander back toward pit straight
+  [830,575],[835,538],[848,505],[866,478],[888,455],
+  // Bridge / back section heading left
+  [890,428],[870,405],[840,390],[800,382],[750,378],[680,375],
+  [580,374],[480,375],[380,377],[280,380],
+]
+
+// Suzuka - figure-8 circuit
+TRACKS.suzuka.points = [
+  // Start/finish straight - heading right
+  [220,480],[320,475],[420,472],[520,470],[620,470],[700,472],
+  // First corner - sweeping right
+  [775,480],[828,505],[858,548],[855,595],
+  // S-curves (most iconic section) - tight left-right-left chicane
+  [840,638],[808,665],[768,672],[730,660],[705,630],[703,595],
+  [715,562],[740,540],[770,530],[800,528],
+  // Degner 1 - right
+  [832,535],[858,555],[868,585],[858,618],
+  // Degner 2 - right
+  [838,645],[808,665],[775,670],[745,658],
+  // Hairpin - very tight U-turn (sharpest on the lap)
+  [718,638],[695,608],[690,572],[700,540],[720,512],[748,494],[778,488],
+  // Spoon curve - long sweeping right, heading left
+  [810,488],[848,495],[878,515],[900,548],[908,588],[902,628],[882,660],
+  [852,682],[815,692],[775,692],[738,682],
+  // Back straight (main straight before 130R) - long heading right/up
+  [705,660],[685,628],[672,592],[668,552],[672,515],[685,482],[705,455],
+  [730,432],[762,415],[800,408],[840,408],[878,415],
+  // 130R - very fast sweeping left-hander
+  [912,428],[945,452],[962,488],[960,528],[942,562],
+  // Chicane (Casio Triangle) - tight left-right braking zone
+  [915,585],[878,605],[842,608],[810,598],[792,572],[795,542],
+  [818,518],[848,508],
+  // Final corner back to start/finish
+  [878,512],[905,518],[928,535],[942,562],[948,595],[940,628],
+  [920,655],[888,672],[852,680],[815,678],[780,668],
+  [750,650],[728,625],[718,595],[720,562],[730,535],
+  // Cross-over section (the bridge/underpass that makes the figure-8)
+  [748,512],[768,492],[792,478],[818,472],[848,472],
+  [878,478],[905,492],[928,515],
+  // Complete loop back to start
+  [942,548],[935,582],[918,608],[892,625],[860,632],
+  [825,628],[800,608],[790,580],[795,552],
+  [808,528],[832,512],[858,505],[888,505],
+  [918,512],[942,528],[958,555],[958,590],[942,622],
+  [918,648],[885,665],[848,672],[812,668],[780,655],
+  [755,632],[740,605],[738,572],[750,542],[768,518],
+  [792,500],[820,490],[848,488],[875,492],[900,505],
+  [918,528],[928,558],[920,590],[905,618],[878,638],
+  // Simplified final stretch back
+  [848,648],[815,648],[782,638],[762,618],[752,592],[755,562],
+  [768,538],[790,520],[818,510],[848,508],[875,512],
+  [900,525],[918,548],[922,578],[912,608],[892,628],
+  [862,640],[830,642],[800,630],[782,608],[778,578],
+  [782,548],[800,525],[825,512],[852,508],
+  // Approach to start straight
+  [878,512],[900,520],[918,540],[925,565],[918,592],[902,615],
+  [875,628],[842,630],[812,618],[792,598],[785,570],
+  // FINAL - return to start/finish
+  [620,470],[520,470],[420,472],[320,475],[220,480],
+]
+
+// Suzuka simplified - cleaner figure-8 that actually makes sense as a closed loop
+TRACKS.suzuka.points = [
+  // Start/finish straight going right
+  [160,500],[260,495],[360,492],[460,490],[560,490],[650,492],
+  // Turn 1 (first corner) - right-hander
+  [720,500],[772,522],[800,562],[795,608],
+  // S-curves - left/right/left tight chicane section
+  [775,648],[740,670],[700,672],[668,652],[650,618],[655,582],
+  [672,552],[698,535],[728,528],[758,532],
+  // Degner curves - right then right
+  [785,542],[808,565],[812,598],[795,628],
+  // Hairpin - sharp U-turn at bottom of circuit
+  [768,652],[738,662],[708,655],[688,630],[682,598],[690,565],
+  [708,540],[732,522],[760,514],[790,514],
+  // Spoon - long sweeping right going back up-left
+  [820,520],[848,535],[865,562],[862,598],[848,628],
+  [822,648],[790,655],[758,648],[735,628],
+  // Back straight (long section heading right then up toward 130R)
+  [718,598],[708,565],[712,532],[725,505],[748,485],[778,472],
+  [810,465],[845,465],[878,472],[908,488],
+  // 130R - very fast sweeping left
+  [935,512],[948,548],[942,585],[922,615],[892,632],
+  // Chicane at end of back straight (braking zone)
+  [858,642],[825,642],[800,625],[790,598],[800,570],
+  [825,555],[852,552],
+  // Final corner returning to pit straight
+  [878,560],[900,578],[908,608],[898,638],[872,655],
+  [840,660],[808,655],[785,638],[772,612],
+  // Cross-over / overpass area back to start
+  [762,582],[758,550],[765,520],[782,495],[808,478],
+  [838,470],[868,470],[895,480],[918,500],[932,528],
+  [935,560],[925,592],[908,618],[882,635],
+  [850,642],[818,638],[795,622],[782,598],[782,568],
+  [790,540],[808,520],[832,510],[858,508],[882,515],
+  // THE KEY: the overpass (back straight goes OVER the S-curves section visually)
+  // We model the circuit as a continuous path - the crossover is just points passing close
+  [908,528],[928,550],[935,578],[928,608],[910,632],
+  [882,648],[850,652],[818,645],[795,625],[782,598],
+  // Return to start
+  [560,490],[460,490],[360,492],[260,495],[160,500],
+]
+
+// Actually let's do a clean, well-designed Suzuka that captures the figure-8 shape properly
+// The key insight: the track crosses itself. Model it as a normal closed loop where the
+// crossing section just happens to pass near the same coordinates from opposite directions.
+TRACKS.suzuka.points = [
+  // Pit straight / start-finish (going rightward)
+  [180,510],[280,505],[390,502],[500,500],[610,500],[700,502],
+  // Turn 1-2: sweeping right entry
+  [768,512],[815,535],[840,572],[835,615],
+  // S-curves (turns 3-7): famous alternating chicane
+  [815,650],[782,672],[748,672],[720,655],[705,622],
+  [710,590],[728,565],[755,552],[784,555],
+  // Degner 1 (turn 8): right
+  [810,568],[832,595],[828,628],
+  // Degner 2 (turn 9): right again
+  [808,652],[780,665],[752,658],[732,635],[726,605],
+  // Hairpin (turn 10): the tightest U-turn
+  [730,572],[742,542],[762,520],[790,510],[820,510],
+  [848,520],[868,545],[868,578],[852,608],
+  // Spoon curve (turns 13-14): long right-hander
+  [828,632],[798,648],[765,648],[738,630],[722,605],[722,572],
+  [738,545],[762,530],[792,525],[820,528],
+  // Back straight (long): heading right
+  [850,535],[888,545],[932,558],[978,575],[1020,595],[1058,618],
+  // 130R (turn 15): very fast sweeping left - car barely turns
+  [1085,648],[1098,682],[1095,718],[1075,748],[1045,765],[1010,770],
+  [972,762],[942,742],[925,712],[922,680],
+  // Chicane (turns 16-17): tight left-right, heavy braking
+  [928,648],[945,622],[968,608],[995,612],[1010,635],[1005,665],
+  [982,682],[955,685],[930,672],[918,648],
+  // Return corner and pit straight entrance
+  [912,618],[908,585],[915,555],[930,530],[952,512],[978,500],
+  [1010,495],[700,500],[500,500],[280,502],[180,510],
+]
+
+// Final clean version - let me do this properly with clean coordinate thinking
+// Suzuka spans roughly 5.8km. In our world space ~1400 wide.
+// The circuit runs roughly: pit straight (going right/east), turn 1-2 (right),
+// S-curves going south, Degner (right), hairpin (U-turn going north), Spoon (right),
+// back straight going north-east, 130R (left), chicane, pit entry back to straight.
+// The figure-8 means the back straight passes OVER the S-curves section.
+TRACKS.suzuka.points = [
+  // ── Pit straight (going right / east) ──
+  [200,480],[310,475],[430,472],[550,470],[670,470],[760,473],
+  // ── Turn 1-2: right-hander complex ──
+  [825,485],[870,510],[892,550],[885,595],
+  // ── S-curves: iconic left-right sequence going southward ──
+  [862,635],[830,658],[795,660],[768,642],[756,610],
+  [762,578],[782,558],[808,552],[835,562],
+  // ── Dunlop curve: right (links S-curves to Degner) ──
+  [858,582],[875,612],[868,645],
+  // ── Degner 2: right ──
+  [845,668],[815,678],[785,672],[762,648],[754,618],
+  // ── Hairpin: tight U-turn, lowest point of circuit ──
+  [758,585],[768,555],[788,532],[815,520],[845,520],
+  [872,532],[888,558],[885,592],[865,622],
+  // ── Spoon curve (turns 13-14): long right-hander ──
+  [838,645],[808,658],[778,655],[752,638],[740,610],
+  [742,578],[758,552],[782,535],[810,530],[840,535],
+  // ── Back straight: long, going right and slightly upward ──
+  // (this section passes OVER the S-curves in real life)
+  [872,542],[918,550],[968,560],[1020,572],[1072,590],[1118,612],
+  // ── 130R: very fast sweeping LEFT ──
+  [1148,642],[1162,678],[1155,718],[1132,748],[1098,762],[1062,758],
+  [1025,742],[1002,715],[998,680],[1008,648],
+  // ── Chicane (Casio Triangle): left then right, heavy braking ──
+  [1028,622],[1052,605],[1080,608],[1095,632],[1088,662],
+  [1062,678],[1035,675],[1018,655],[1015,625],
+  // ── Final corner back to pit straight ──
+  [1018,595],[1025,565],[1042,542],[1065,528],[1092,522],
+  [670,470],[550,470],[430,472],[310,475],[200,480],
+]
 
 // ─── catmull-rom sampler ──────────────────────────────────────────────────────
 function buildSmooth(rawPts, samples = 500) {
@@ -232,13 +462,13 @@ function renderCar(ctx, x, y, angle, spd) {
 }
 
 // ─── minimap ─────────────────────────────────────────────────────────────────
-function renderMinimap(ctx, smooth, carX, carY, accentColor) {
+function renderMinimap(ctx, smooth, carX, carY, accentColor, fl) {
   // Compute bounding box of track
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity
   smooth.forEach(([x,y])=>{if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y})
   const tw=maxX-minX, th=maxY-minY
-  const MW=110, MH=Math.round(MW*th/tw)||70
-  const MX=CW-MW-10, MY=10
+  const MW=120, MH=Math.round(MW*th/tw)||80
+  const MX=CW-MW-12, MY=12
   const scX=(p)=>MX+(p-minX)/tw*MW
   const scY=(p)=>MY+(p-minY)/th*MH
 
@@ -250,6 +480,14 @@ function renderMinimap(ctx, smooth, carX, carY, accentColor) {
   smooth.forEach(([x,y],i)=>i?ctx.lineTo(scX(x),scY(y)):ctx.moveTo(scX(x),scY(y)))
   ctx.closePath()
   ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=3; ctx.stroke()
+
+  // Start/finish line dash on minimap
+  if (fl) {
+    const mx1=scX(fl.lx1+(fl.lx2-fl.lx1)*0.2), my1=scY(fl.ly1+(fl.ly2-fl.ly1)*0.2)
+    const mx2=scX(fl.lx1+(fl.lx2-fl.lx1)*0.8), my2=scY(fl.ly1+(fl.ly2-fl.ly1)*0.8)
+    ctx.beginPath(); ctx.moveTo(mx1,my1); ctx.lineTo(mx2,my2)
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=2; ctx.stroke()
+  }
 
   const cx=scX(carX), cy=scY(carY)
   ctx.fillStyle=accentColor; ctx.shadowColor=accentColor; ctx.shadowBlur=5
@@ -282,6 +520,9 @@ export default function GamePage() {
   const [submitTime, setSubmitTime] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Countdown: null = not started, 3/2/1 = lights on, 0 = GO!, -1 = racing
+  const [countdown, setCountdown] = useState(null)
+  const countdownRef = useRef(null)
 
   const fetchLB = useCallback(async (tid) => {
     if (!tid) return
@@ -316,15 +557,41 @@ export default function GamePage() {
     setTrackId(tid)
     initTrack(tid)
     setSaved(false); setSubmitTime(null); setSubmitName('')
-    setPhase('racing')
     fetchLB(tid)
+    // Start countdown sequence
+    setCountdown(3)
+    setPhase('countdown')
   }
 
   function restartRace() {
     initTrack(trackId)
     setSaved(false); setSubmitTime(null); setSubmitName('')
-    setPhase('racing')
+    setCountdown(3)
+    setPhase('countdown')
   }
+
+  // Countdown timer effect
+  useEffect(()=>{
+    if(phase!=='countdown') return
+    // Clear any existing countdown timer
+    if(countdownRef.current) clearTimeout(countdownRef.current)
+
+    if(countdown === null) return
+
+    if(countdown > 0){
+      // Each light stays on for 1000ms (like real F1 lights)
+      countdownRef.current = setTimeout(()=>{
+        setCountdown(c => c - 1)
+      }, 1000)
+    } else if(countdown === 0){
+      // "GO!" stays for 800ms then starts race
+      countdownRef.current = setTimeout(()=>{
+        setCountdown(-1)
+        setPhase('racing')
+      }, 800)
+    }
+    return () => { if(countdownRef.current) clearTimeout(countdownRef.current) }
+  },[phase, countdown])
 
   // Keys
   useEffect(()=>{
@@ -445,7 +712,7 @@ export default function GamePage() {
       ctx.fillStyle=vig; ctx.fillRect(0,0,CW,CH)
 
       // Minimap
-      renderMinimap(ctx, smooth, s.x, s.y, track.accentColor)
+      renderMinimap(ctx, smooth, s.x, s.y, track.accentColor, fl)
 
       // Speed lines when fast
       if(spd>5){
@@ -459,6 +726,26 @@ export default function GamePage() {
         ctx.restore()
       }
 
+      // Current lap time - large display at center-bottom
+      if(s.started && s.lapStart){
+        const elapsed = Date.now() - s.lapStart
+        const timeStr = fmt(elapsed)
+        ctx.save()
+        ctx.font = 'bold 22px monospace'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        // Shadow/background
+        ctx.fillStyle = 'rgba(0,0,0,0.55)'
+        const tw2 = ctx.measureText(timeStr).width
+        ctx.fillRect(CW/2 - tw2/2 - 12, CH - 42, tw2 + 24, 32)
+        // Time text
+        ctx.fillStyle = '#ffffff'
+        ctx.shadowColor = 'rgba(57,255,20,0.5)'
+        ctx.shadowBlur = 8
+        ctx.fillText(timeStr, CW/2, CH - 12)
+        ctx.restore()
+      }
+
       setHud({lap:s.lapCount,lastLap:s.lastLap,bestLap:s.bestLap,
         spd:Math.round(spd*52),elapsed:s.lapStart?Date.now()-s.lapStart:0})
 
@@ -469,13 +756,52 @@ export default function GamePage() {
     return()=>cancelAnimationFrame(rafRef.current)
   },[phase,trackId])
 
+  // Countdown canvas render (shows car on track while counting down)
+  useEffect(()=>{
+    if(phase!=='countdown') return
+    const canvas=canvasRef.current; if(!canvas) return
+    const ctx=canvas.getContext('2d')
+    const track=TRACKS[trackId]
+    const smooth=stRef.current
+    const fl=flRef.current
+    const s=gsRef.current
+
+    function renderCountdownFrame(){
+      ctx.clearRect(0,0,CW,CH)
+      ctx.fillStyle='#0c1a09'; ctx.fillRect(0,0,CW,CH)
+
+      ctx.save()
+      ctx.translate(CW/2-s.camX,CH/2-s.camY)
+      renderTrack(ctx, smooth, track.accentColor, fl)
+      renderCar(ctx, s.x, s.y, s.angle, 0)
+      ctx.restore()
+
+      const vig=ctx.createRadialGradient(CW/2,CH/2,CW*0.3,CW/2,CH/2,CW*0.75)
+      vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.45)')
+      ctx.fillStyle=vig; ctx.fillRect(0,0,CW,CH)
+
+      renderMinimap(ctx, smooth, s.x, s.y, track.accentColor, fl)
+    }
+    renderCountdownFrame()
+  },[phase,trackId,countdown])
+
   async function submitScore(){
     if(!submitName.trim()||!submitTime) return
     setSubmitting(true)
     try {
-      await addDoc(collection(db,`game_lb_${trackId}`),{
-        name:submitName.trim().slice(0,24), time:submitTime, date:serverTimestamp()
-      })
+      const name = submitName.trim().slice(0,24)
+      const col = collection(db,`game_lb_${trackId}`)
+      const existing = await getDocs(query(col, where('name','==',name), limit(1)))
+      if(!existing.empty){
+        const existingDoc = existing.docs[0]
+        if(submitTime < existingDoc.data().time){
+          await setDoc(doc(db,`game_lb_${trackId}`,existingDoc.id),{
+            name, time:submitTime, date:serverTimestamp()
+          })
+        }
+      } else {
+        await addDoc(col,{name, time:submitTime, date:serverTimestamp()})
+      }
       setSaved(true); fetchLB(trackId)
     } catch{}
     setSubmitting(false)
@@ -486,7 +812,7 @@ export default function GamePage() {
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div style={{minHeight:'100vh',background:'#050505',paddingBottom:'80px'}}>
-      <div style={{maxWidth:'1060px',margin:'0 auto',padding:'24px 20px 0'}}>
+      <div style={{maxWidth:'1160px',margin:'0 auto',padding:'24px 20px 0'}}>
 
         <div style={{display:'flex',alignItems:'center',gap:'16px',marginBottom:'20px'}}>
           <Link to="/" style={{color:'var(--muted)',fontSize:'12px',fontFamily:'var(--font-mono)',letterSpacing:'1px'}}>← BACK</Link>
@@ -503,18 +829,66 @@ export default function GamePage() {
         <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
 
           {/* Canvas + overlays */}
-          <div style={{flex:'1 1 580px'}}>
+          <div style={{flex:'1 1 640px'}}>
             <div style={{position:'relative',border:`1px solid rgba(255,255,255,0.1)`,borderRadius:'4px',overflow:'hidden',background:'#0c1a09'}}>
               <canvas ref={canvasRef} width={CW} height={CH} style={{display:'block',width:'100%'}}/>
 
               {/* HUD */}
-              {phase==='racing' && (
+              {(phase==='racing') && (
                 <div style={{position:'absolute',top:10,left:10,display:'flex',flexDirection:'column',gap:'4px'}}>
                   <HudBox label="LAP" val={gsRef.current.lapCount===0?'--':`${Math.min(gsRef.current.lapCount,TOTAL_LAPS)} / ${TOTAL_LAPS}`} />
                   <HudBox label="TIME" val={fmt(hud.elapsed)} />
                   <HudBox label="LAST" val={fmt(hud.lastLap)} />
                   <HudBox label="BEST" val={fmt(hud.bestLap)} green />
                   <HudBox label="KM/H" val={hud.spd} />
+                </div>
+              )}
+
+              {/* Countdown overlay */}
+              {phase==='countdown' && (
+                <div style={{...overlayS, background:'rgba(0,0,0,0.0)', backdropFilter:'none', pointerEvents:'none'}}>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
+                    {/* F1-style lights panel */}
+                    <div style={{
+                      display:'flex',gap:'12px',padding:'16px 24px',
+                      background:'rgba(0,0,0,0.82)',
+                      border:'2px solid rgba(255,255,255,0.15)',
+                      borderRadius:'8px',
+                      boxShadow:'0 0 40px rgba(0,0,0,0.8)',
+                    }}>
+                      {countdown === 0
+                        ? (
+                          <div style={{
+                            fontFamily:'var(--font-heading)',
+                            fontSize:'52px',fontWeight:900,
+                            color:'#39FF14',
+                            letterSpacing:'6px',
+                            textShadow:'0 0 30px rgba(57,255,20,0.9)',
+                          }}>GO!</div>
+                        )
+                        : [3,2,1].map(n=>{
+                          const lit = countdown !== null && n >= countdown
+                          return (
+                            <div key={n} style={{
+                              width:44,height:44,borderRadius:'50%',
+                              background: lit ? '#cc1100' : '#1a1a1a',
+                              border: lit ? '2px solid #ff3333' : '2px solid #333',
+                              boxShadow: lit ? '0 0 20px rgba(200,0,0,0.9), inset 0 0 10px rgba(255,100,100,0.4)' : '0 0 4px rgba(0,0,0,0.5)',
+                              transition:'all 0.1s ease',
+                            }}/>
+                          )
+                        })
+                      }
+                    </div>
+                    {countdown > 0 && (
+                      <div style={{
+                        fontFamily:'var(--font-mono)',
+                        fontSize:'13px',
+                        color:'rgba(255,255,255,0.5)',
+                        letterSpacing:'2px',
+                      }}>LIGHTS OUT IN {countdown}...</div>
+                    )}
+                  </div>
                 </div>
               )}
 
